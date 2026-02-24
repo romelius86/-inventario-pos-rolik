@@ -1,0 +1,3 @@
+instalar en el terminal de powershell
+
+py -m pip install fpdf2

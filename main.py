@@ -1,0 +1,2700 @@
+import os
+import openpyxl
+import csv
+import requests  # Para consultas a APIs de DNI/RUC
+from datetime import datetime
+from fpdf import FPDF
+
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Vertical, Horizontal, VerticalScroll
+from textual.screen import Screen
+from textual.widgets import Header, Footer, Static, Button, DataTable, Label, Input, Checkbox
+
+import database
+
+# --- Mapeo de encabezados ---
+DB_TO_EXCEL_MAP = {
+    'codigo': ['CODIGO', 'CÓDIGO', 'Codigo'],
+    'nombre': ['NOMBRE'],
+    'fabricante': ['FABRICANTE'],
+    'descripcion': ['DESCRIPCIÓN', 'DESCRIPCION'],
+    'precio_venta': ['PRECIO VENTA', 'P.Venta articulo', 'P.VENTA'],
+    'precio_compra': ['PRECIO COMPRA', 'P.COMPRA'],
+    'unidad': ['UNIDAD'],
+    'stock': ['STOCK EN ALMACEN', 'STOCK'],
+    'fecha_ingreso': ['FECHA INGRESO'],
+    'proveedor_nombre': ['PROVEEDOR'],
+    'categoria': ['CATEGORIA', 'categoria']
+}
+
+# --- Lógica de Importación ---
+
+def import_products_from_excel(filepath):
+    if not os.path.exists(filepath):
+        return (False, f"Error: No se encontró el archivo:\n{filepath}")
+
+    try:
+        workbook = openpyxl.load_workbook(filepath, data_only=True)
+        # Intentar con la hoja "productos" o la primera disponible
+        sheet_name = "productos" if "productos" in workbook.sheetnames else workbook.sheetnames[0]
+        sheet = workbook[sheet_name]
+        
+        raw_headers = [str(cell.value).strip() if cell.value else "" for cell in sheet[1]]
+        
+        column_map = {}
+        for db_field, possible_headers in DB_TO_EXCEL_MAP.items():
+            for header_text in possible_headers:
+                if header_text in raw_headers:
+                    column_map[raw_headers.index(header_text)] = db_field
+                    break
+        
+        if 'codigo' not in column_map.values() and 'nombre' not in column_map.values():
+            return (False, "Error: No se encontró columna 'CODIGO' o 'NOMBRE' en el Excel.")
+
+        products_to_import = []
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            if all(cell is None for cell in row): continue
+            product_data = {column_map[i]: row[i] for i in column_map if i < len(row)}
+            if product_data.get('codigo') or product_data.get('nombre'):
+                # Limpia y prepara cada fila antes de guardarla
+                prepared = database.add_product_from_flexible_import(product_data)
+                products_to_import.append(prepared)
+        
+        if products_to_import:
+            database.bulk_add_products(products_to_import)
+            return (True, f"¡Éxito! Se procesaron {len(products_to_import)} productos desde Excel.")
+        else:
+            return (False, "No se encontraron datos válidos en el archivo Excel.")
+    except Exception as e:
+        return (False, f"Error Excel: {e}")
+
+def import_products_from_csv(filepath):
+    if not os.path.exists(filepath):
+        return (False, f"Error: No se encontró el archivo:\n{filepath}")
+
+    detected_encoding = None
+    encodings_to_try = ['utf-8-sig', 'latin-1', 'cp1252']
+    for encoding in encodings_to_try:
+        try:
+            with open(filepath, 'r', encoding=encoding) as f: f.read()
+            detected_encoding = encoding
+            break
+        except UnicodeDecodeError: continue
+
+    if not detected_encoding:
+        return (False, "Error CSV: No se pudo decodificar el archivo (ni UTF-8 ni ANSI).")
+
+    try:
+        with open(filepath, mode='r', encoding=detected_encoding) as f:
+            try:
+                dialect = csv.Sniffer().sniff(f.read(4096), delimiters=",;")
+                f.seek(0)
+            except csv.Error:
+                dialect = 'excel'
+            
+            reader = csv.reader(f, dialect)
+            
+            header_row = None
+            data_rows_iterator = None
+            for row in reader:
+                norm_row = [str(c).strip().upper() for c in row]
+                if "CODIGO" in norm_row or "NOMBRE" in norm_row:
+                    header_row = row
+                    data_rows_iterator = reader # El iterador ahora apunta al resto de las filas
+                    break
+            
+            if not header_row:
+                return (False, "Error CSV: No se encontró una fila de encabezado con 'CODIGO' o 'NOMBRE'.")
+
+            raw_headers = header_row
+            norm_headers = {h.strip().upper(): h for h in raw_headers}
+            column_map = {}
+            for db_field, possible_headers in DB_TO_EXCEL_MAP.items():
+                for header_text in possible_headers:
+                    if header_text.upper() in norm_headers:
+                        column_map[norm_headers[header_text.upper()]] = db_field
+                        break
+            
+            products_to_add = []
+            for row_list in data_rows_iterator:
+                if not any(field for field in row_list): continue
+                row_dict = dict(zip(raw_headers, row_list))
+                
+                product_data_raw = {column_map[h]: row_dict.get(h) for h in column_map if row_dict.get(h) is not None}
+                if product_data_raw.get('codigo') or product_data_raw.get('nombre'):
+                    # Prepara el diccionario de datos limpios
+                    prepared_data = database.add_product_from_flexible_import(product_data_raw)
+                    products_to_add.append(prepared_data)
+            
+            if not products_to_add:
+                return (False, "No se encontraron productos válidos para importar en el archivo.")
+            
+            # Realizar la inserción en bloque
+            database.bulk_add_products(products_to_add)
+            
+            return (True, f"¡Éxito! Se procesaron {len(products_to_add)} productos (codificación: {detected_encoding}).")
+    except Exception as e:
+        return (False, f"Error al procesar el CSV: {type(e).__name__}: {e}")
+
+def import_products_from_file(filepath):
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext in ['.xlsx', '.xlsm']:
+        return import_products_from_excel(filepath)
+    elif ext == '.csv':
+        return import_products_from_csv(filepath)
+    else:
+        return (False, f"Error: Formato '{ext}' no soportado. Usa .xlsx, .xlsm o .csv")
+
+# --- Pantallas de la Aplicación ---
+
+class ImportDialog(Screen):
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal-container"):
+            yield Label("IMPORTAR INVENTARIO", id="modal_title")
+            yield Label("Pega la ruta del archivo (.csv, .xlsx, .xlsm):")
+            yield Input(placeholder="Ej: C:\\documentos\\mi_inventario.csv", id="in_filepath")
+            with Horizontal(classes="form-buttons"):
+                yield Button("Importar", "success", id="btn_import_start")
+                yield Button("Cancelar", "error", id="btn_cancel")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_import_start":
+            filepath = self.query_one("#in_filepath", Input).value.strip('"').strip()
+            if not filepath:
+                self.app.notify("Por favor, ingresa una ruta.", severity="error")
+                return
+            
+            self.app.notify("Procesando archivo...", severity="information")
+            success, message = import_products_from_file(filepath)
+            
+            if success:
+                self.app.notify(message, severity="information", timeout=8)
+                self.dismiss(True) # Cierra el diálogo y activa el refresco
+            else:
+                self.app.notify(message, severity="error", timeout=15)
+        
+        elif event.button.id == "btn_cancel":
+            self.dismiss(False) # Cierra sin refrescar
+
+class LoginScreen(Screen):
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal-container", id="login-container"):
+            yield Label("ROLIK - INICIO DE SESIÓN", id="modal_title")
+            yield Label("Usuario:")
+            yield Input(placeholder="admin / vendedor", id="login_user")
+            yield Label("Contraseña:")
+            yield Input(placeholder="contraseña", id="login_pass", password=True)
+            with Horizontal(classes="form-buttons"):
+                yield Button("Ingresar", variant="success", id="btn_login")
+                yield Button("Salir", variant="error", id="btn_exit_app")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_login":
+            user_text = self.query_one("#login_user", Input).value
+            pw_text = self.query_one("#login_pass", Input).value
+            
+            user_data = database.authenticate_user(user_text, pw_text) # Devuelve dict o None
+            if user_data:
+                self.dismiss(user_data) # Pasar el dict completo al callback
+            else:
+                self.app.notify("Usuario o contraseña incorrectos o inactivos.", severity="error")
+        elif event.button.id == "btn_exit_app":
+            self.app.exit()
+
+class MainMenu(Screen):
+    def compose(self) -> ComposeResult:
+        yield Header(show_clock=True)
+        user_name = getattr(self.app, "user_name", "Usuario")
+        
+        with Vertical(id="menu_container"):
+            yield Label(f"SISTEMA ROLIK ERP - {user_name.upper()}", id="title")
+            
+            if self.app.has_permission('product.view'):
+                yield Button("1. INVENTARIO", id="btn_inventory", variant="primary")
+            
+            if self.app.has_permission('purchase_order.view'):
+                yield Button("2. ÓRDENES DE COMPRA", id="btn_purchases", variant="primary")
+            
+            # NUEVO BOTÓN DE CLIENTES
+            yield Button("3. GESTIÓN DE CLIENTES", id="btn_customers", variant="primary")
+                
+            if self.app.has_permission('user.view'):
+                yield Button("USUARIOS", id="btn_users", variant="primary")
+
+            if self.app.has_permission('report.view.sales') or self.app.has_permission('report.view.cash') or self.app.has_permission('report.view.commissions'):
+                yield Button("REPORTES", id="btn_reports", variant="warning")
+            
+            if self.app.has_permission('pos.use'):
+                yield Button("4. PUNTO DE VENTA (POS)", id="btn_pos", variant="success")
+            
+            if self.app.has_permission('cash.manage'):
+                yield Button("5. GESTIÓN DE CAJA", id="btn_cash", variant="warning")
+                
+            yield Button("SALIR", id="btn_exit", variant="error")
+        yield Footer()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        screen_map = {
+            "btn_inventory": InventoryScreen,
+            "btn_purchases": PurchaseOrderListScreen,
+            "btn_customers": CustomerManagementScreen, # Nueva pantalla
+            "btn_pos": POSScreen,
+            "btn_cash": CashScreen,
+        }
+        if event.button.id in screen_map:
+            self.app.push_screen(screen_map[event.button.id]())
+        elif event.button.id == "btn_users":
+            self.app.push_screen(UserManagementScreen())
+        elif event.button.id == "btn_reports":
+            self.app.push_screen(ReportsMenuScreen())
+        elif event.button.id == "btn_exit":
+            self.app.exit()
+
+class CustomerManagementScreen(Screen):
+    """Pantalla profesional para el CRUD de clientes."""
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Volver"),
+        Binding("n", "add_customer", "Nuevo"),
+        Binding("e", "edit_customer", "Editar"),
+        Binding("delete", "delete_customer", "Eliminar")
+    ]
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("GESTIÓN INTEGRAL DE CLIENTES", id="section_title")
+        with Horizontal(id="customer_search_bar"):
+            yield Input(placeholder="Buscar por Nombre o Documento...", id="in_search_cust")
+            yield Button("Nuevo (N)", variant="success", id="btn_new_cust")
+        
+        yield DataTable(id="customers_table")
+        
+        with Horizontal(id="customer_actions"):
+            yield Button("Editar (E)", variant="warning", id="btn_edit_cust")
+            yield Button("Eliminar (Supr)", variant="error", id="btn_del_cust")
+            yield Button("Volver (ESC)", variant="error", id="btn_back")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        table = self.query_one(DataTable)
+        table.cursor_type = "row"
+        table.add_columns("Documento", "Nombre / Razón Social", "Dirección", "Teléfono", "Email")
+        self.refresh_customers()
+
+    def on_input_changed(self, event: Input.Changed):
+        if event.input.id == "in_search_cust":
+            self.refresh_customers(event.value)
+
+    def refresh_customers(self, search=""):
+        table = self.query_one(DataTable)
+        table.clear()
+        for c in database.get_all_customers(search):
+            table.add_row(
+                str(c['documento']), 
+                str(c['nombre']), 
+                str(c['direccion'] or '-'), 
+                str(c['telefono'] or '-'), 
+                str(c['email'] or '-'),
+                key=str(c['documento'])
+            )
+
+    def action_add_customer(self):
+        self.app.push_screen(AddEditCustomerDialog(), lambda success: self.refresh_customers() if success else None)
+
+    def action_edit_customer(self):
+        try:
+            table = self.query_one(DataTable)
+            doc = str(table.get_cell_at((table.cursor_row, 0)))
+            client_data = database.buscar_cliente_local(doc)
+            if client_data:
+                client_data['documento'] = doc
+                self.app.push_screen(AddEditCustomerDialog(client_data), lambda success: self.refresh_customers() if success else None)
+        except Exception:
+            self.app.notify("Seleccione un cliente para editar.", severity="error")
+
+    def action_delete_customer(self):
+        try:
+            table = self.query_one(DataTable)
+            doc = str(table.get_cell_at((table.cursor_row, 0)))
+            nombre = str(table.get_cell_at((table.cursor_row, 1)))
+            
+            # Nota: En una app real pediríamos confirmación. Aquí borramos y notificamos.
+            if database.delete_customer(doc):
+                self.app.notify(f"Cliente '{nombre}' eliminado.", severity="warning")
+                self.refresh_customers()
+        except Exception:
+            self.app.notify("Seleccione un cliente para eliminar.", severity="error")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_new_cust": self.action_add_customer()
+        elif event.button.id == "btn_edit_cust": self.action_edit_customer()
+        elif event.button.id == "btn_del_cust": self.action_delete_customer()
+        elif event.button.id == "btn_back": self.app.pop_screen()
+
+class AddEditCustomerDialog(Screen):
+    """Diálogo para crear o editar clientes."""
+    def __init__(self, client_data=None):
+        super().__init__()
+        self.client_data = client_data
+        self.is_edit = client_data is not None
+
+    def compose(self) -> ComposeResult:
+        title = "EDITAR CLIENTE" if self.is_edit else "REGISTRAR NUEVO CLIENTE"
+        with Vertical(classes="modal-container", id="cust-form-container"):
+            yield Label(title, id="modal_title")
+            yield Input(placeholder="DNI o RUC", id="in_doc", disabled=self.is_edit)
+            yield Input(placeholder="Nombre o Razón Social", id="in_name")
+            yield Input(placeholder="Dirección", id="in_dir")
+            yield Input(placeholder="Teléfono", id="in_tel")
+            yield Input(placeholder="Correo Electrónico", id="in_email")
+            with Horizontal(classes="form-buttons"):
+                yield Button("Guardar", variant="success", id="btn_save_cust")
+                yield Button("Cancelar", variant="error", id="btn_cancel_cust")
+
+    def on_mount(self):
+        if self.is_edit:
+            self.query_one("#in_doc").value = self.client_data['documento']
+            self.query_one("#in_name").value = self.client_data['nombre']
+            self.query_one("#in_dir").value = self.client_data.get('direccion') or ""
+            self.query_one("#in_tel").value = self.client_data.get('telefono') or ""
+            self.query_one("#in_email").value = self.client_data.get('email') or ""
+        self.query_one("#in_name" if self.is_edit else "#in_doc").focus()
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_save_cust":
+            doc = self.query_one("#in_doc").value.strip()
+            name = self.query_one("#in_name").value.strip()
+            if not doc or not name:
+                self.app.notify("Documento y Nombre son obligatorios.", severity="error")
+                return
+            
+            data = {
+                'documento': doc,
+                'nombre': name,
+                'direccion': self.query_one("#in_dir").value.strip(),
+                'telefono': self.query_one("#in_tel").value.strip(),
+                'email': self.query_one("#in_email").value.strip()
+            }
+            database.add_or_update_customer(data)
+            self.dismiss(True)
+        else:
+            self.dismiss(False)
+
+class UserManagementScreen(Screen):
+    BINDINGS = [Binding("escape", "app.pop_screen", "Volver"), ("n", "add_user", "Nuevo"), ("e", "edit_user", "Editar"), ("p", "manage_perms", "Permisos")]
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("GESTIÓN DE USUARIOS (SOLO ADMINISTRADOR)", id="section_title")
+        yield DataTable(id="users_table")
+        with Horizontal(id="user_actions"):
+            yield Button("Nuevo (N)", "success", id="btn_new_user")
+            yield Button("Editar (E)", "primary", id="btn_edit_user")
+            yield Button("Permisos (P)", "primary", id="btn_manage_perms")
+            yield Button("Activar/Desactivar", "warning", id="btn_toggle_active")
+            yield Button("Eliminar", "error", id="btn_delete_user")
+            yield Button("Volver (ESC)", "error", id="btn_back")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        table = self.query_one(DataTable)
+        table.cursor_type = "row"
+        table.add_columns("ID", "Usuario", "Rol", "Estado", "Desc. Habilitado", "% Desc. Máx.", "Comisión %")
+        self.refresh_users()
+
+    def refresh_users(self):
+        table = self.query_one(DataTable)
+        table.clear()
+        for u in database.get_all_users():
+            estado = "Activo" if u['is_active'] else "Inactivo"
+            desc_habilitado = "Sí" if u['is_discount_enabled'] else "No"
+            table.add_row(str(u['id']), u['username'], u['role'], estado, desc_habilitado, f"{u['max_discount_percentage']}%", f"{u['commission_rate']*100:.0f}%")
+
+    def action_add_user(self):
+        self.app.push_screen(AddUserDialog(), lambda success: self.refresh_users() if success else None)
+
+    def action_edit_user(self):
+        try:
+            table = self.query_one(DataTable)
+            user_id = int(table.get_cell_at((table.cursor_row, 0)))
+            self.app.push_screen(EditUserDialog(user_id=user_id), lambda success: self.refresh_users() if success else None)
+        except Exception:
+            self.app.notify("Selecciona un usuario para editar.", severity="error")
+
+    def action_manage_perms(self):
+        try:
+            table = self.query_one(DataTable)
+            user_id = int(table.get_cell_at((table.cursor_row, 0)))
+            self.app.push_screen(UserPermissionsScreen(user_id=user_id))
+        except Exception:
+            self.app.notify("Selecciona un usuario para gestionar sus permisos.", severity="error")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_new_user": self.action_add_user()
+        elif event.button.id == "btn_edit_user": self.action_edit_user()
+        elif event.button.id == "btn_manage_perms": self.action_manage_perms()
+        elif event.button.id == "btn_toggle_active":
+            try:
+                table = self.query_one(DataTable)
+                user_id = int(table.get_cell_at((table.cursor_row, 0)))
+                user = database.get_user_by_id(user_id)
+                if user['username'] == self.app.user_name:
+                    self.app.notify("No puedes desactivarte a ti mismo.", severity="error")
+                    return
+                
+                new_status = not user['is_active']
+                database.set_user_active_status(user_id, new_status)
+                self.app.notify(f"Usuario '{user['username']}' ahora está {'ACTIVO' if new_status else 'INACTIVO'}.", severity="warning")
+                self.refresh_users()
+            except Exception:
+                self.app.notify("Selecciona un usuario para cambiar su estado.", severity="error")
+
+        elif event.button.id == "btn_delete_user":
+            try:
+                table = self.query_one(DataTable)
+                user_id = int(table.get_cell_at((table.cursor_row, 0)))
+                user_name = table.get_cell_at((table.cursor_row, 1))
+                if user_name == self.app.user_name:
+                    self.app.notify("No puedes eliminarte a ti mismo.", severity="error")
+                    return
+                database.delete_user(user_id)
+                self.app.notify(f"Usuario {user_name} eliminado permanentemente.", severity="warning")
+                self.refresh_users()
+            except Exception:
+                self.app.notify("Selecciona un usuario para eliminar.", severity="error")
+        elif event.button.id == "btn_back": self.app.pop_screen()
+
+class UserPermissionsScreen(Screen):
+    BINDINGS = [Binding("escape", "app.pop_screen", "Volver")]
+
+    def __init__(self, user_id: int):
+        super().__init__()
+        self.user_id = user_id
+        self.all_permissions = []
+        self.user_permissions_ids = set()
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label(f"GESTIONAR PERMISOS", id="section_title")
+        with VerticalScroll(id="permissions-container"):
+            pass # Se llenará dinámicamente en on_mount
+        with Horizontal(classes="form-buttons"):
+            yield Button("Guardar Permisos", "success", id="btn_save_permissions")
+            yield Button("Cancelar", "error", id="btn_cancel")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        user = database.get_user_by_id(self.user_id)
+        if not user:
+            self.app.notify("Usuario no encontrado.", severity="error")
+            self.app.pop_screen()
+            return
+        
+        self.query_one("#section_title", Label).update(f"GESTIONAR PERMISOS PARA '{user['username'].upper()}'")
+        
+        self.all_permissions = database.get_all_permissions()
+        user_perms_names = database.get_user_permissions(self.user_id)
+        
+        container = self.query_one("#permissions-container", VerticalScroll)
+        
+        for perm in self.all_permissions:
+            has_perm = perm['name'] in user_perms_names
+            checkbox = Checkbox(f"{perm['name']} - {perm['description']}", value=has_perm, id=f"perm_{perm['id']}")
+            container.mount(checkbox)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_save_permissions":
+            permission_ids_to_set = []
+            for perm in self.all_permissions:
+                checkbox = self.query_one(f"#perm_{perm['id']}", Checkbox)
+                if checkbox.value:
+                    permission_ids_to_set.append(perm['id'])
+            
+            try:
+                database.update_user_permissions(self.user_id, permission_ids_to_set)
+                self.app.notify("Permisos actualizados.", severity="success")
+                self.app.pop_screen()
+            except Exception as e:
+                self.app.notify(f"Error al guardar permisos: {e}", severity="error")
+        
+        elif event.button.id == "btn_cancel":
+            self.app.pop_screen()
+
+
+
+class AddUserDialog(Screen):
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal-container"):
+            yield Label("CREAR NUEVO USUARIO", id="modal_title")
+            yield Label("Nombre:")
+            yield Input(placeholder="Usuario", id="new_user_name")
+            yield Label("Contraseña:")
+            yield Input(placeholder="Password", id="new_user_pass", password=True)
+            yield Label("Rol (admin/seller):")
+            yield Input(placeholder="admin o seller", id="new_user_role")
+            yield Label("Habilitar Descuento (1=Sí, 0=No):")
+            yield Input(placeholder="0 o 1", id="new_user_discount_enabled", restrict=r"[01]")
+            yield Label("Porcentaje Máximo de Descuento (0-100):")
+            yield Input(placeholder="0-100", id="new_user_max_discount", restrict=r"[0-9]*")
+            yield Label("Tasa de Comisión (0.00-1.00):")
+            yield Input(placeholder="Ej: 0.05 para 5%", id="new_user_commission_rate", restrict=r"[0-9.]*")
+            with Horizontal(classes="form-buttons"):
+                yield Button("Crear", "success", id="btn_create_user")
+                yield Button("Cancelar", "error", id="btn_cancel")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_create_user":
+            name = self.query_one("#new_user_name", Input).value
+            pw = self.query_one("#new_user_pass", Input).value
+            role = self.query_one("#new_user_role", Input).value.lower().strip()
+            discount_enabled_str = self.query_one("#new_user_discount_enabled", Input).value
+            max_discount_str = self.query_one("#new_user_max_discount", Input).value
+            commission_rate_str = self.query_one("#new_user_commission_rate", Input).value
+            
+            is_discount_enabled = int(discount_enabled_str) if discount_enabled_str else 0
+            max_discount_percentage = int(max_discount_str) if max_discount_str else 0
+            commission_rate = float(commission_rate_str) if commission_rate_str else 0.0
+
+            if not (0 <= max_discount_percentage <= 100):
+                self.app.notify("El porcentaje de descuento debe ser entre 0 y 100.", severity="error")
+                return
+            
+            if not (0.0 <= commission_rate <= 1.0):
+                self.app.notify("La tasa de comisión debe ser entre 0.00 y 1.00.", severity="error")
+                return
+
+            if role not in ["admin", "seller"]:
+                self.app.notify("Rol inválido. Usa 'admin' o 'seller'.", severity="error")
+                return
+
+            if name and pw and role:
+                if database.add_user(name, pw, role, is_discount_enabled, max_discount_percentage, commission_rate):
+                    self.app.notify("Usuario creado.", severity="success")
+                    self.dismiss(True)
+                else: self.app.notify("El usuario ya existe.", severity="error")
+            else: self.app.notify("Todos los campos son obligatorios.", severity="error")
+        elif event.button.id == "btn_cancel": self.dismiss(False)
+
+class EditUserDialog(Screen):
+    def __init__(self, user_id: int):
+        super().__init__()
+        self.user_id = user_id
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal-container"):
+            yield Label("EDITAR USUARIO", id="modal_title")
+            yield Label("Nombre de Usuario:")
+            yield Input(id="edit_user_name")
+            yield Label("Rol (admin/seller):")
+            yield Input(id="edit_user_role")
+            yield Label("Habilitar Descuento (1=Sí, 0=No):")
+            yield Input(id="edit_user_discount_enabled", restrict=r"[01]")
+            yield Label("Porcentaje Máximo de Descuento (0-100):")
+            yield Input(id="edit_user_max_discount", restrict=r"[0-9]*")
+            yield Label("Tasa de Comisión (0.00-1.00):")
+            yield Input(id="edit_user_commission_rate", restrict=r"[0-9.]*")
+            yield Label("Nueva Contraseña (dejar en blanco para no cambiar):")
+            yield Input(id="edit_user_pass", password=True, placeholder="Nueva contraseña opcional")
+            with Horizontal(classes="form-buttons"):
+                yield Button("Guardar Cambios", "success", id="btn_save_user")
+                yield Button("Cancelar", "error", id="btn_cancel")
+
+    def on_mount(self) -> None:
+        user = database.get_user_by_id(self.user_id)
+        if user:
+            self.query_one("#edit_user_name", Input).value = user['username']
+            self.query_one("#edit_user_role", Input).value = user['role']
+            self.query_one("#edit_user_discount_enabled", Input).value = str(user['is_discount_enabled'])
+            self.query_one("#edit_user_max_discount", Input).value = str(user['max_discount_percentage'])
+            self.query_one("#edit_user_commission_rate", Input).value = str(user['commission_rate'])
+        else:
+            self.app.notify("Error: No se encontró al usuario.", severity="error")
+            self.dismiss(False)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_save_user":
+            name = self.query_one("#edit_user_name", Input).value
+            role = self.query_one("#edit_user_role", Input).value.lower().strip()
+            is_discount_enabled_str = self.query_one("#edit_user_discount_enabled", Input).value
+            max_discount_str = self.query_one("#edit_user_max_discount", Input).value
+            commission_rate_str = self.query_one("#edit_user_commission_rate", Input).value
+            new_pass = self.query_one("#edit_user_pass", Input).value
+
+            is_discount_enabled = int(is_discount_enabled_str) if is_discount_enabled_str else 0
+            max_discount_percentage = int(max_discount_str) if max_discount_str else 0
+            commission_rate = float(commission_rate_str) if commission_rate_str else 0.0
+
+            if not (0 <= max_discount_percentage <= 100):
+                self.app.notify("El porcentaje de descuento debe ser entre 0 y 100.", severity="error")
+                return
+            
+            if not (0.0 <= commission_rate <= 1.0):
+                self.app.notify("La tasa de comisión debe ser entre 0.00 y 1.00.", severity="error")
+                return
+
+            if role not in ["admin", "seller"]:
+                self.app.notify("Rol inválido. Usa 'admin' o 'seller'.", severity="error")
+                return
+
+            if not name or not role:
+                self.app.notify("Nombre y Rol son campos obligatorios.", severity="error")
+                return
+
+            # Actualizar nombre, rol y configuración de descuento
+            if not database.update_user(self.user_id, name, role, is_discount_enabled, max_discount_percentage, commission_rate):
+                self.app.notify(f"Error: El nombre de usuario '{name}' ya existe.", severity="error")
+                return
+
+            # Actualizar contraseña si se proporcionó una nueva
+            if new_pass:
+                database.update_user_password(self.user_id, new_pass)
+            
+            self.app.notify("Usuario actualizado con éxito.", severity="success")
+            self.dismiss(True)
+
+        elif event.button.id == "btn_cancel":
+            self.dismiss(False)
+
+class InventoryScreen(Screen):
+    BINDINGS = [Binding(key, action, desc) for key, action, desc in [
+        ("escape", "app.pop_screen", "Volver"), ("n", "add_product", "Nuevo"),
+        ("e", "edit_product", "Editar"), ("d", "delete_product", "Eliminar"),
+        ("i", "import_excel", "Importar"), ("r", "refresh_table", "Refrescar")]]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.search_term = ""
+        self.sort_by = "nombre_asc"
+    
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("ROLIK - INVENTARIO DE PRODUCTOS", id="section_title")
+        with Horizontal(id="search_sort_bar"):
+            yield Input(placeholder="Buscar por código, nombre...", id="search_box")
+            yield Button("Nombre ↓", id="sort_name_desc", variant="primary")
+            yield Button("Nombre ↑", id="sort_name_asc", variant="primary")
+            yield Button("Stock ↓", id="sort_stock_desc", variant="primary")
+            yield Button("Stock ↑", id="sort_stock_asc", variant="primary")
+
+        yield DataTable(id="inventory_table", zebra_stripes=True)
+        
+        with Horizontal(id="inventory_actions"):
+            if self.app.has_permission('product.create'):
+                yield Button("Nuevo (N)", "success", id="btn_new")
+            if self.app.has_permission('product.edit'):
+                yield Button("Editar (E)", "warning", id="btn_edit")
+            if self.app.has_permission('product.delete'):
+                yield Button("Eliminar (D)", "error", id="btn_delete")
+            if self.app.has_permission('product.import'):
+                yield Button("Importar (I)", "primary", id="btn_import") 
+            yield Button("Refrescar (R)", "primary", id="btn_refresh")
+            yield Button("Volver (ESC)", "error", id="btn_back")
+        
+        yield Footer()
+    
+    def on_mount(self) -> None:
+        table = self.query_one(DataTable); table.cursor_type = "row"
+        table.add_columns("Código", "Nombre", "Categoría", "Fabricante", "Descripción", "P.Venta", "P.Compra", "Unidad", "Stock", "Fecha Ingreso", "Importe Inv.", "Proveedor")
+        self.refresh_inventory()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "search_box":
+            self.search_term = event.value
+            self.refresh_inventory()
+
+    def on_product_saved(self, success: bool):
+        if success: self.refresh_inventory(); self.app.notify("Producto guardado.", severity="success")
+    
+    def action_add_product(self): self.app.push_screen(AddEditProductScreen(), self.on_product_saved)
+    
+    def action_edit_product(self):
+        try:
+            table = self.query_one(DataTable)
+            if table.row_count == 0: raise IndexError()
+            codigo = table.get_cell_at((table.cursor_row, 0))
+            self.app.push_screen(AddEditProductScreen(product_codigo=codigo), self.on_product_saved)
+        except Exception: self.app.notify("Selecciona un producto para editar.", severity="error")
+
+    def action_delete_product(self):
+        try:
+            table = self.query_one(DataTable)
+            if table.row_count == 0: return
+            codigo = table.get_cell_at((table.cursor_row, 0))
+            database.delete_product(codigo)
+            self.refresh_inventory()
+            self.app.notify(f"Producto {codigo} eliminado.", severity="warning")
+        except Exception: self.app.notify("Error al eliminar el producto.", severity="error")
+    
+    def refresh_inventory(self):
+        try:
+            table = self.query_one(DataTable)
+            table.clear()
+            
+            # Pasa los parámetros de búsqueda y orden a la función de la base de datos
+            products = database.get_all_products_for_display(
+                search_term=self.search_term, 
+                sort_by=self.sort_by
+            )
+            
+            for p in products:
+                codigo = str(p['codigo'] or "")
+                nombre = str(p['nombre'] or "")
+                cat = str(p['categoria'] or "")
+                fab = str(p['fabricante'] or "")
+                desc = str(p['descripcion'] or "")
+                p_venta = f"${(p['precio_venta'] or 0.0):.2f}"
+                p_compra = f"${(p['precio_compra'] or 0.0):.2f}"
+                unidad = str(p['unidad'] or "")
+                stock = str(p['stock'] or "0")
+                fecha = str(p['fecha_ingreso'] or "")[:10]
+                importe = f"${(p['importe_inventario'] or 0.0):.2f}"
+                prov = str(p['proveedor'] or "")
+
+                table.add_row(
+                    codigo, nombre, cat, fab, desc, p_venta, p_compra, 
+                    unidad, stock, fecha, importe, prov,
+                    key=codigo
+                )
+            
+            table.refresh()
+                
+        except Exception as e:
+            self.app.notify(f"Error visual: {e}", severity="error")
+    
+    def action_refresh_table(self): 
+        self.search_term = ""
+        self.query_one("#search_box", Input).value = ""
+        self.sort_by = "nombre_asc"
+        self.refresh_inventory()
+    
+    def action_import_excel(self):
+        self.app.push_screen(ImportDialog(), lambda success: self.refresh_inventory() if success else None)
+    
+    def on_button_pressed(self, event: Button.Pressed):
+        action_map = {
+            "btn_new": self.action_add_product, 
+            "btn_edit": self.action_edit_product,
+            "btn_delete": self.action_delete_product,
+            "btn_import": self.action_import_excel, 
+            "btn_refresh": self.action_refresh_table,
+            "btn_back": self.app.pop_screen
+        }
+        
+        sort_map = {
+            "sort_name_asc": "nombre_asc",
+            "sort_name_desc": "nombre_desc",
+            "sort_stock_asc": "stock_asc",
+            "sort_stock_desc": "stock_desc",
+        }
+
+        if event.button.id in action_map:
+            action_map[event.button.id]()
+        elif event.button.id in sort_map:
+            self.sort_by = sort_map[event.button.id]
+            self.refresh_inventory()
+
+class AddEditProductScreen(Screen):
+    BINDINGS = [Binding("escape", "app.pop_screen", "Salir")]
+
+    def __init__(self, product_codigo: str | None = None):
+        super().__init__(); self.product_codigo, self.is_edit_mode = product_codigo, product_codigo is not None
+    
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("EDITAR PRODUCTO" if self.is_edit_mode else "AÑADIR NUEVO PRODUCTO", id="modal_title")
+        
+        with VerticalScroll(id="form-body"):
+            yield Label("Código:")
+            yield Input(id="in_codigo", disabled=self.is_edit_mode)
+            yield Label("Nombre:")
+            yield Input(id="in_nombre")
+            yield Label("Categoría:")
+            yield Input(id="in_categoria")
+            yield Label("Fabricante:")
+            yield Input(id="in_fabricante")
+            yield Label("Proveedor:")
+            yield Input(id="in_proveedor")
+            yield Label("Descripción:")
+            yield Input(id="in_descripcion")
+            yield Label("P.Venta:")
+            yield Input(id="in_precio_venta", restrict=r"[0-9.]*")
+            yield Label("P.Compra:")
+            yield Input(id="in_precio_compra", restrict=r"[0-9.]*")
+            yield Label("Unidad:")
+            yield Input(id="in_unidad")
+            yield Label("Stock:")
+            yield Input(id="in_stock", restrict=r"[0-9]*")
+            yield Label("Stock Mínimo:")
+            yield Input(id="in_stock_minimo", restrict=r"[0-9]*")
+
+        with Horizontal(classes="form-buttons"):
+            yield Button("Guardar cambios", variant="success", id="btn_save")
+            yield Button("Salir (sin guardar)", variant="error", id="btn_cancel")
+        
+        yield Footer()
+    
+    def on_mount(self):
+        if self.is_edit_mode:
+            product = database.get_product(self.product_codigo)
+            if product:
+                p = dict(product)
+                for key in ["codigo", "nombre", "categoria", "fabricante", "descripcion", "precio_venta", "precio_compra", "unidad", "stock", "stock_minimo"]: self.query_one(f"#in_{key}", Input).value = str(p.get(key) or '')
+                self.query_one("#in_proveedor", Input).value = str(p.get('proveedor_nombre', ''))
+    
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_save":
+            p_data = {k: self.query_one(f"#in_{k}", Input).value for k in ["codigo", "nombre", "categoria", "fabricante", "descripcion", "precio_venta", "precio_compra", "unidad", "stock", "stock_minimo"]}
+            p_data["proveedor_nombre"] = self.query_one("#in_proveedor", Input).value
+            if self.is_edit_mode:
+                product = database.get_product(self.product_codigo)
+                p_data['fecha_ingreso'] = product['fecha_ingreso'] if product else None
+            
+            if not p_data["codigo"] and not self.is_edit_mode:
+                 p_data["codigo"] = f"P-{int(datetime.now().timestamp())}"
+            
+            if not p_data["nombre"]:
+                self.app.notify("El campo 'Nombre' es obligatorio.", severity="error")
+                return
+
+            database.add_or_update_product(p_data)
+            self.dismiss(True)
+        elif event.button.id == "btn_cancel":
+            self.dismiss(False)
+
+class POSScreen(Screen):
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Volver"),
+        Binding("f2", "finish_sale", "Finalizar"),
+        Binding("f4", "clear_sale", "Limpiar")
+    ]
+    
+    def __init__(self): 
+        super().__init__()
+        self.cart = {} # {codigo: [nombre, cantidad, precio]}
+        self.total = 0.0
+        self.discount_percentage = 0
+    
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with Horizontal():
+            with Vertical(id="pos_left"):
+                yield Label("ROLIK - PUNTO DE VENTA (POS)", classes="section_title")
+                yield Label("Buscar por Código/Nombre:")
+                yield Input(id="pos_in_search", placeholder="Escriba código o nombre...")
+                yield DataTable(id="pos_table")
+            with Vertical(id="pos_right"):
+                yield Label("RESUMEN", classes="section_title")
+                yield Static("SUBTOTAL: $0.00", id="pos_subtotal_label")
+                yield Label("Descuento (%):")
+                yield Input("0", id="pos_in_discount", restrict=r"[0-9]*")
+                yield Static("TOTAL: $0.00", id="pos_total_label")
+                yield Button("Finalizar Pago (F2)", variant="success", id="btn_finish")
+                yield Button("Eliminar Item Seleccionado", variant="error", id="btn_delete_item")
+                yield Button("Limpiar Todo (F4)", variant="warning", id="btn_clear")
+                yield Button("Volver (ESC)", variant="error", id="btn_back")
+        yield Footer()
+    
+    def on_mount(self):
+        table = self.query_one("#pos_table")
+        table.add_columns("Código", "Producto", "Marca", "Unidad", "Cant.", "Stock", "P.Unit", "Subtotal")
+        table.cursor_type = "row"
+        self.query_one("#pos_in_search").focus()
+        if not database.get_active_session():
+            self.app.notify("¡Caja cerrada! Abra la caja para vender.", severity="error")
+            self.query_one("#pos_in_search").disabled = True
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "pos_in_search":
+            search_term = event.value.strip()
+            if search_term:
+                self.handle_search(search_term)
+                event.input.value = ""
+
+    def handle_search(self, term):
+        # 1. Buscar por código exacto primero (para escáner de barras)
+        product = database.get_product(term)
+        if product:
+            self.prompt_quantity(product)
+            return
+
+        # 2. Si no es código exacto, buscar coincidencias por nombre o parte del código
+        results = database.get_all_products_for_display(search_term=term)
+        
+        if len(results) == 0:
+            self.app.notify(f"No se encontró nada con '{term}'.", severity="error")
+        elif len(results) == 1:
+            # Si solo hay uno, lo agregamos directamente
+            full_prod = database.get_product(results[0]['codigo'])
+            self.prompt_quantity(full_prod)
+        else:
+            # Si hay varios, mostramos ventana de selección
+            self.app.push_screen(ProductSearchDialog(term, results), self.on_product_selected)
+
+    def on_product_selected(self, product_code):
+        if product_code:
+            product = database.get_product(product_code)
+            if product:
+                self.prompt_quantity(product)
+
+    def prompt_quantity(self, product):
+        """Abre un diálogo para pedir la cantidad antes de añadir al carrito."""
+        def check_qty(qty):
+            if qty: self.add_to_cart(product, qty)
+        self.app.push_screen(QuantityDialog(product), check_qty)
+
+    def add_to_cart(self, product, qty):
+        codigo = product['codigo']
+        nombre = product['nombre']
+        marca = str(product['fabricante'] or "N/A")
+        unidad = str(product['unidad'] or "Und")
+        stock = product['stock'] or 0
+        precio = product['precio_venta'] or 0.0
+        
+        # Estructura del carrito: [nombre, cantidad, precio, stock, marca, unidad]
+        in_cart = self.cart.get(codigo, [None, 0, None, 0, None, None])[1]
+        
+        if stock < (in_cart + qty):
+            self.app.notify(f"Stock insuficiente para '{nombre}'. Disponible: {stock}", severity="error")
+            return
+        
+        if codigo in self.cart:
+            self.cart[codigo][1] += qty
+        else:
+            self.cart[codigo] = [nombre, qty, precio, stock, marca, unidad]
+        
+        self.refresh_pos_table()
+
+    def refresh_pos_table(self):
+        """Actualiza la tabla del carrito y los totales en pantalla."""
+        table = self.query_one("#pos_table")
+        table.clear()
+        subtotal_calc = 0.0
+        for codigo, (nombre, qty, price, stock, marca, unidad) in self.cart.items(): 
+            item_subtotal = qty * (price or 0)
+            subtotal_calc += item_subtotal
+            table.add_row(codigo, nombre, marca, unidad, str(qty), str(stock), f"${price or 0:.2f}", f"${item_subtotal:.2f}")
+        
+        self.query_one("#pos_subtotal_label").update(f"SUBTOTAL: ${subtotal_calc:.2f}")
+        total_with_disc = subtotal_calc * (1 - self.discount_percentage / 100)
+        self.total = total_with_disc
+        self.query_one("#pos_total_label").update(f"TOTAL: ${self.total:.2f}")
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_finish":
+            self.action_finish_sale()
+        elif event.button.id == "btn_delete_item":
+            self.delete_selected_item()
+        elif event.button.id == "btn_clear":
+            self.action_clear_sale()
+        elif event.button.id == "btn_back":
+            self.app.pop_screen()
+
+    def delete_selected_item(self):
+        table = self.query_one("#pos_table")
+        try:
+            codigo = table.get_cell_at((table.cursor_row, 0))
+            if codigo in self.cart:
+                del self.cart[codigo]
+                self.refresh_pos_table()
+        except Exception:
+            self.app.notify("Selecciona un item para eliminar.", severity="error")
+
+    def action_finish_sale(self):
+        if not self.cart:
+            self.app.notify("Carrito vacío.", severity="warning")
+            return
+        # Lanzar el diálogo de pago
+        self.app.push_screen(PaymentDialog(self.total), self.on_payment_finished)
+
+    def on_payment_finished(self, payment_result):
+        if payment_result:
+            session = database.get_active_session()
+            items = [(code, data[1], data[2]) for code, data in self.cart.items()]
+            try:
+                trans_id, correlativo = database.record_sale(session['id'], self.total, items, self.app.user_id, payment_result)
+                self.app.notify(f"Venta registrada: {correlativo}", severity="success")
+                # Mostrar ticket final con opción de impresión
+                self.app.push_screen(FinalReceiptScreen(self.cart.copy(), self.total, payment_result, correlativo))
+                self.action_clear_sale()
+            except Exception as e:
+                self.app.notify(f"Error al grabar: {e}", severity="error")
+
+    def action_clear_sale(self):
+        self.cart.clear()
+        self.discount_percentage = 0
+        self.refresh_pos_table()
+
+class ProductSearchDialog(Screen):
+    """Ventana emergente para seleccionar productos cuando la búsqueda devuelve varios resultados."""
+    BINDINGS = [Binding("escape", "cancel_search", "Cerrar")]
+
+    def __init__(self, term, results):
+        super().__init__()
+        self.term = term
+        self.results = results
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal-container", id="search-dialog"):
+            yield Label(f"RESULTADOS PARA: '{self.term.upper()}'", id="modal_title")
+            yield DataTable(id="search_results_table")
+            with Horizontal(classes="form-buttons"):
+                yield Button("Seleccionar (Enter)", variant="success", id="btn_select_prod")
+                yield Button("Cancelar (ESC)", variant="error", id="btn_cancel_search")
+
+    def on_mount(self):
+        table = self.query_one("#search_results_table")
+        table.add_columns("Código", "Producto", "Marca", "Unidad", "Stock", "Precio")
+        table.cursor_type = "row"
+        for p in self.results:
+            fab = str(p['fabricante'] or "N/A")
+            unidad = str(p['unidad'] or "Und")
+            table.add_row(
+                p['codigo'], p['nombre'], fab, unidad, str(p['stock']), 
+                f"${p['precio_venta']:.2f}", 
+                key=p['codigo']
+            )
+        table.focus()
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected):
+        if event.row_key:
+            self.dismiss(str(event.row_key.value))
+
+    def action_cancel_search(self):
+        self.dismiss(None)
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_select_prod":
+            table = self.query_one("#search_results_table")
+            try:
+                if table.cursor_row is not None:
+                    row_key = table.proxy.get_row_key_at(table.cursor_row)
+                    self.dismiss(str(row_key.value))
+                else:
+                    self.app.notify("Selecciona un producto de la lista.")
+            except Exception:
+                self.app.notify("Error al seleccionar.")
+        elif event.button.id == "btn_cancel_search":
+            self.dismiss(None)
+
+class QuantityDialog(Screen):
+    """Diálogo pequeño para ingresar la cantidad de un producto."""
+    def __init__(self, product):
+        super().__init__()
+        self.product = product
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal-container", id="qty-dialog"):
+            yield Label(f"CANTIDAD PARA: {self.product['nombre']}")
+            yield Label(f"Stock Disponible: {self.product['stock']}")
+            yield Input("1", id="in_qty", restrict=r"[0-9]*")
+            with Horizontal(classes="form-buttons"):
+                yield Button("Agregar", variant="success", id="btn_add")
+                yield Button("Cancelar", variant="error", id="btn_cancel")
+
+    def on_mount(self):
+        self.query_one("#in_qty").focus()
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_add":
+            try:
+                qty = int(self.query_one("#in_qty").value)
+                if qty <= 0:
+                    self.app.notify("La cantidad debe ser mayor a cero.")
+                    return
+                self.dismiss(qty)
+            except ValueError:
+                self.app.notify("Ingrese un número válido.")
+        else:
+            self.dismiss(None)
+
+class PaymentDialog(Screen):
+    def __init__(self, total):
+        super().__init__()
+        self.total = total
+        self.payment_method = "EFECTIVO"
+        self.comp_type = "BOLETA"
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal-container", id="pay-dialog-container"):
+            yield Label(f"FINALIZAR VENTA - TOTAL: S/ {self.total:.2f}", id="modal_title")
+            
+            yield Label("Tipo de Comprobante:")
+            with Horizontal(classes="options-row"):
+                yield Button("BOLETA", id="btn_boleta", variant="primary")
+                yield Button("FACTURA", id="btn_factura")
+                yield Button("TICKET", id="btn_ticket")
+
+            yield Label("Datos del Cliente:")
+            with Horizontal(id="client-search-row"):
+                yield Input(placeholder="DNI/RUC", id="in_client_doc", restrict=r"[0-9]*")
+                yield Button("🔍 Buscar", id="btn_search_client", variant="primary")
+            
+            yield Input(placeholder="Nombre o Razón Social", id="in_client_name")
+            yield Input(placeholder="Dirección (Opcional)", id="in_client_dir")
+            
+            with Horizontal(classes="options-row"):
+                yield Input(placeholder="Teléfono", id="in_client_tel", restrict=r"[0-9]*")
+                yield Input(placeholder="Correo electrónico", id="in_client_email")
+
+            yield Label("Método de Pago:")
+            with Horizontal(classes="options-row"):
+                yield Button("EFECTIVO", id="btn_efectivo", variant="primary")
+                yield Button("TARJETA", id="btn_tarjeta")
+                yield Button("YAPE/PLIN", id="btn_yape")
+                yield Button("MIXTO", id="btn_mixto")
+
+            yield Label("Monto Recibido:")
+            yield Input(str(self.total), id="in_paid_amount", restrict=r"[0-9.]*")
+            yield Static("Vuelto: S/ 0.00", id="lbl_change")
+            
+            with Horizontal(classes="form-buttons"):
+                yield Button("Confirmar Pago", variant="success", id="btn_confirm_pay")
+                yield Button("Cancelar", variant="error", id="btn_cancel_pay")
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_search_client":
+            self.consultar_cliente()
+        elif event.button.id in ["btn_boleta", "btn_factura", "btn_ticket"]:
+            for bid in ["btn_boleta", "btn_factura", "btn_ticket"]:
+                self.query_one(f"#{bid}").variant = "default"
+            event.button.variant = "primary"
+            self.comp_type = str(event.button.label)
+            
+            doc_input = self.query_one("#in_client_doc")
+            if self.comp_type == "FACTURA": doc_input.placeholder = "RUC (11 dígitos)"
+            elif self.comp_type == "BOLETA": doc_input.placeholder = "DNI (8 dígitos)"
+            else: doc_input.placeholder = "Doc. (Opcional)"
+
+        elif event.button.id in ["btn_efectivo", "btn_tarjeta", "btn_yape", "btn_mixto"]:
+            for bid in ["btn_efectivo", "btn_tarjeta", "btn_yape", "btn_mixto"]:
+                self.query_one(f"#{bid}").variant = "default"
+            event.button.variant = "primary"
+            self.payment_method = str(event.button.label)
+
+        elif event.button.id == "btn_confirm_pay":
+            try:
+                name = self.query_one("#in_client_name").value.strip() or "PÚBLICO EN GENERAL"
+                doc = self.query_one("#in_client_doc").value.strip() or "00000000"
+                dir = self.query_one("#in_client_dir").value.strip()
+                tel = self.query_one("#in_client_tel").value.strip()
+                email = self.query_one("#in_client_email").value.strip()
+                
+                if self.comp_type == "FACTURA":
+                    if len(doc) != 11:
+                        self.app.notify("La Factura requiere RUC de 11 dígitos.", severity="error")
+                        return
+                elif self.comp_type == "BOLETA":
+                    if len(doc) != 8 and doc != "00000000":
+                        self.app.notify("La Boleta requiere DNI de 8 dígitos.", severity="error")
+                        return
+
+                # GUARDAR/ACTUALIZAR EN LA BASE DE DATOS DE CLIENTES
+                if doc != "00000000":
+                    database.add_or_update_customer({
+                        'documento': doc, 'nombre': name, 'direccion': dir, 
+                        'telefono': tel, 'email': email
+                    })
+
+                paid = float(self.query_one("#in_paid_amount").value or 0)
+                if paid < self.total and self.payment_method == "EFECTIVO":
+                    self.app.notify("Monto insuficiente.", severity="error")
+                    return
+                
+                self.dismiss({
+                    'metodo_pago': self.payment_method,
+                    'tipo_comprobante': self.comp_type,
+                    'monto_pagado': paid,
+                    'vuelto': max(0, paid - self.total),
+                    'cliente_nombre': name.upper(),
+                    'cliente_documento': doc
+                })
+            except ValueError: self.app.notify("Monto inválido.")
+        elif event.button.id == "btn_cancel_pay": self.dismiss(None)
+
+    def consultar_cliente(self):
+        """Consulta datos de DNI/RUC priorizando la base de datos local."""
+        documento = self.query_one("#in_client_doc").value.strip()
+        if not (len(documento) == 8 or len(documento) == 11):
+            self.app.notify("Ingrese 8 dígitos para DNI o 11 para RUC.", severity="error")
+            return
+
+        self.app.notify("Buscando cliente...", severity="information")
+        
+        # 1. INTENTO LOCAL (Clientes registrados en la nueva tabla)
+        c = database.buscar_cliente_local(documento)
+        if c:
+            self.query_one("#in_client_name").value = str(c['nombre'] or "")
+            self.query_one("#in_client_dir").value = str(c['direccion'] or "")
+            self.query_one("#in_client_tel").value = str(c['telefono'] or "")
+            self.query_one("#in_client_email").value = str(c['email'] or "")
+            self.app.notify("¡Cliente encontrado en base de datos!")
+            return
+
+        # 2. INTENTO POR INTERNET (Si no es cliente frecuente)
+        self.app.notify("Nuevo cliente. Consultando internet...", severity="information")
+        tipo = "dni" if len(documento) == 8 else "ruc"
+        urls = [
+            f"https://api.apisperu.com/v1/{tipo}/{documento}",
+            f"https://dniruc.apisperu.com/api/v1/{tipo}/{documento}"
+        ]
+        headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+        encontrado = False
+
+        for url in urls:
+            try:
+                response = requests.get(url, headers=headers, timeout=3)
+                if response.status_code == 200:
+                    data = response.json()
+                    nombre = data.get('nombre') or data.get('razonSocial') or data.get('nombre_completo')
+                    if nombre:
+                        self.query_one("#in_client_name").value = nombre.upper()
+                        self.app.notify("¡Datos encontrados en internet!")
+                        encontrado = True
+                        break
+            except Exception: continue
+        
+        if not encontrado:
+            self.app.notify("No se pudo conectar. Ingrese datos manualmente.", severity="warning")
+            self.query_one("#in_client_name").focus()
+
+    def on_input_changed(self, event: Input.Changed):
+        if event.input.id == "in_paid_amount":
+            try:
+                change = max(0, float(event.value or 0) - self.total)
+                self.query_one("#lbl_change").update(f"Vuelto: S/ {change:.2f}")
+            except ValueError: pass
+
+class FinalReceiptScreen(Screen):
+    def __init__(self, cart, total, pay_data, correlativo):
+        super().__init__()
+        self.cart = cart
+        self.total = total
+        self.pay_data = pay_data
+        self.correlativo = correlativo
+
+    def compose(self) -> ComposeResult:
+        # Formato visual para la pantalla
+        receipt = self.generar_texto_ticket()
+        with Vertical(classes="modal-container", id="final-receipt-container"):
+            yield Static(receipt, id="ticket_text_view")
+            with Horizontal(classes="form-buttons"):
+                yield Button("Imprimir Ticket (80mm)", variant="success", id="btn_print_thermal")
+                yield Button("Cerrar y Nueva Venta", variant="primary", id="btn_done")
+
+    def generar_texto_ticket(self):
+        """Genera el contenido del ticket compacto para ticketera de 80mm."""
+        w = 36 # Ancho reducido para evitar desbordes
+        now = datetime.now().strftime('%d/%m/%y %H:%M')
+        
+        t = f"{'='*w}\n"
+        t += f"{'FERRETERIA ROLIK':^{w}}\n"
+        t += f"{'RUC: 10440809320':^{w}}\n"
+        t += f"{'CEL: 988352912 / 932326764':^{w}}\n"
+        t += f"{'MZ A LT 26 P.I. MADERA KM 15.5':^{w}}\n"
+        t += f"{'='*w}\n"
+        t += f"COMP: {self.pay_data['tipo_comprobante']}\n"
+        t += f"NUM : {self.correlativo}\n"
+        t += f"FECHA: {now}\n"
+        t += f"CLI : {self.pay_data.get('cliente_nombre', 'P. GENERAL')[:w-6]}\n"
+        t += f"DOC : {self.pay_data.get('cliente_documento', '00000000')}\n"
+        t += f"{'-'*w}\n"
+        t += f"{'CANT':<4} {'DESCRIPCION':<22} {'TOT':>8}\n"
+        t += f"{'-'*w}\n"
+        
+        for codigo, datos in self.cart.items():
+            # [nombre, qty, price, stock, marca, unidad]
+            nombre = str(datos[0])[:20]
+            qty = datos[1]
+            price = datos[2]
+            sub = qty * price
+            t += f"{str(qty):<4} {nombre:<22} {sub:>8.2f}\n"
+        
+        t += f"{'-'*w}\n"
+        subtotal = self.total / 1.18
+        igv = self.total - subtotal
+        
+        t += f"{'SUBTOTAL:':<26} {subtotal:>8.2f}\n"
+        t += f"{'IGV (18%):':<26} {igv:>8.2f}\n"
+        t += f"{'TOTAL:':<24} S/ {self.total:>8.2f}\n"
+        t += f"{'-'*w}\n"
+        t += f"PAGO: {self.pay_data['metodo_pago']} | REC: {self.pay_data['monto_pagado']:.2f}\n"
+        t += f"VUELTO: S/ {self.pay_data['vuelto']:.2f}\n"
+        t += f"{'='*w}\n"
+        t += f"{'¡GRACIAS POR SU COMPRA!':^{w}}\n"
+        t += f"{'='*w}\n\n\n" # Espacio final para el corte manual
+        return t
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_print_thermal":
+            self.imprimir_ticket_archivo()
+        else:
+            self.app.pop_screen()
+
+    def imprimir_ticket_archivo(self):
+        """Guarda el ticket en un archivo .txt listo para enviar a la ticketera."""
+        try:
+            filename = f"Ticket_{self.correlativo}.txt"
+            content = self.generar_texto_ticket()
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(content)
+            
+            self.app.notify(f"Ticket generado: {filename}", severity="information")
+            if os.name == 'nt':
+                os.startfile(filename)
+        except Exception as e:
+            self.app.notify(f"Error al imprimir: {e}", severity="error")
+
+class CashScreen(Screen):
+    BINDINGS = [Binding("escape", "app.pop_screen", "Volver")]
+    
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="form-container"):
+            yield Label("GESTIÓN DE CAJA", id="modal_title"); yield Static(id="cash_status_label")
+            with Vertical(id="open_cash_container"):
+                yield Label("Monto Inicial:")
+                yield Input("0.00", id="in_initial_fund", restrict=r"[0-9.]*")
+                yield Button("Abrir Caja", variant="success", id="btn_open_cash")
+            with Vertical(id="close_cash_container"):
+                yield Static(id="sales_summary_label")
+                yield Button("Cerrar Caja", variant="error", id="btn_close_cash")
+            yield Button("Volver", variant="primary", id="btn_back")
+    
+    def on_mount(self): self.refresh_cash_status()
+    
+    def refresh_cash_status(self):
+        session = database.get_active_session()
+        self.query_one("#open_cash_container").display = not session
+        self.query_one("#close_cash_container").display = bool(session)
+        if session:
+            self.query_one("#cash_status_label").update(f"CAJA ABIERTA (Desde: {session['open_date']})")
+            total_sales = database.get_sales_for_session(session['id'])
+            self.query_one("#sales_summary_label").update(f"Ventas Totales: ${total_sales:.2f}")
+        else: self.query_one("#cash_status_label").update("CAJA CERRADA")
+    
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_open_cash":
+            if (fund_str := self.query_one("#in_initial_fund", Input).value): database.open_cash_session(float(fund_str), self.app.user_id); self.app.notify("Caja abierta.", severity="success"); self.refresh_cash_status()
+            else: self.app.notify("Ingrese el monto inicial.", severity="error")
+        elif event.button.id == "btn_close_cash":
+            if session := database.get_active_session():
+                total_sales = database.get_sales_for_session(session['id'])
+                database.close_cash_session(session['id'], total_sales, self.app.user_id); self.app.notify(f"Caja cerrada. Total Ventas: ${total_sales:.2f}", severity="success"); self.refresh_cash_status()
+        elif event.button.id == "btn_back": self.app.pop_screen()
+
+# --- Módulo de Órdenes de Compra ---
+class SalesReportScreen(Screen):
+    BINDINGS = [Binding("escape", "app.pop_screen", "Volver"), ("r", "refresh_report", "Refrescar")]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.selected_user_id = None
+        self.start_date = ""
+        self.end_date = ""
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("REPORTE DE VENTAS POR VENDEDOR", id="section_title")
+        with Horizontal(id="report_filters"):
+            yield Label("Vendedor:")
+            yield Input(placeholder="Todos", id="filter_seller_name", classes="filter-input")
+            yield Button("Seleccionar Vendedor", id="btn_select_seller")
+            yield Label("Desde (YYYY-MM-DD):")
+            yield Input(placeholder="YYYY-MM-DD", id="filter_start_date", classes="filter-input")
+            yield Label("Hasta (YYYY-MM-DD):")
+            yield Input(placeholder="YYYY-MM-DD", id="filter_end_date", classes="filter-input")
+            yield Button("Refrescar (R)", id="btn_refresh_report")
+        yield DataTable(id="sales_report_table")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        table = self.query_one(DataTable)
+        table.cursor_type = "row"
+        table.add_columns("ID Venta", "Fecha", "Total", "Vendedor")
+        self.refresh_report()
+
+    def refresh_report(self):
+        try:
+            start_date = self.query_one("#filter_start_date", Input).value
+            end_date = self.query_one("#filter_end_date", Input).value
+            
+            table = self.query_one(DataTable)
+            table.clear()
+
+            sales = database.get_sales_history(
+                user_id=self.selected_user_id,
+                start_date=start_date if start_date else None,
+                end_date=end_date if end_date else None
+            )
+
+            total_sales_amount = 0.0
+            for sale in sales:
+                table.add_row(
+                    str(sale['transaction_id']),
+                    str(sale['transaction_date']),
+                    f"${sale['transaction_total']:.2f}",
+                    str(sale['seller_name'])
+                )
+                total_sales_amount += sale['transaction_total']
+            
+            table.add_row("", "", "", "", key="total-row", classes="footer")
+            table.add_row("TOTAL:", "", "", f"${total_sales_amount:.2f}", key="total-row-val", classes="footer")
+
+        except Exception as e:
+            self.app.notify(f"Error al cargar el reporte de ventas: {e}", severity="error")
+
+    def action_refresh_report(self):
+        self.refresh_report()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_refresh_report":
+            self.refresh_report()
+        elif event.button.id == "btn_select_seller":
+            self.app.push_screen(UserSelectionDialog(), callback=self.on_seller_selected)
+        elif event.button.id == "btn_back":
+            self.app.pop_screen()
+
+    def on_seller_selected(self, user_data: dict | None):
+        if user_data:
+            self.selected_user_id = user_data['id']
+            self.query_one("#filter_seller_name", Input).value = user_data['username']
+        else:
+            self.selected_user_id = None
+            self.query_one("#filter_seller_name", Input).value = "Todos"
+        self.refresh_report()
+
+class CashReportScreen(Screen):
+    BINDINGS = [Binding("escape", "app.pop_screen", "Volver"), ("r", "refresh_report", "Refrescar")]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.selected_user_id = None
+        self.start_date = ""
+        self.end_date = ""
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("REPORTE DE SESIONES DE CAJA", id="section_title")
+        with Horizontal(id="report_filters"):
+            yield Label("Usuario:")
+            yield Input(placeholder="Todos", id="filter_user_name", classes="filter-input")
+            yield Button("Seleccionar Usuario", id="btn_select_user")
+            yield Label("Desde (YYYY-MM-DD):")
+            yield Input(placeholder="YYYY-MM-DD", id="filter_start_date", classes="filter-input")
+            yield Label("Hasta (YYYY-MM-DD):")
+            yield Input(placeholder="YYYY-MM-DD", id="filter_end_date", classes="filter-input")
+            yield Button("Refrescar (R)", id="btn_refresh_report")
+        yield DataTable(id="cash_report_table")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        table = self.query_one(DataTable)
+        table.cursor_type = "row"
+        table.add_columns("ID Sesión", "Apertura", "Cierre", "Monto Inicial", "Ventas Totales", "Estado", "Abrió", "Cerró")
+        self.refresh_report()
+
+    def refresh_report(self):
+        try:
+            start_date = self.query_one("#filter_start_date", Input).value
+            end_date = self.query_one("#filter_end_date", Input).value
+            
+            table = self.query_one(DataTable)
+            table.clear()
+
+            sessions = database.get_cash_sessions_history(
+                user_id=self.selected_user_id,
+                start_date=start_date if start_date else None,
+                end_date=end_date if end_date else None
+            )
+
+            for session in sessions:
+                table.add_row(
+                    str(session['session_id']),
+                    str(session['open_date']),
+                    str(session['close_date'] or "N/A"),
+                    f"${session['initial_fund']:.2f}",
+                    f"${session['total_sales']:.2f}",
+                    str(session['status']),
+                    str(session['opened_by_username'] or "N/A"),
+                    str(session['closed_by_username'] or "N/A")
+                )
+        except Exception as e:
+            self.app.notify(f"Error al cargar el reporte de caja: {e}", severity="error")
+
+    def action_refresh_report(self):
+        self.refresh_report()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_refresh_report":
+            self.refresh_report()
+        elif event.button.id == "btn_select_user":
+            self.app.push_screen(UserSelectionDialog(), callback=self.on_user_selected)
+        elif event.button.id == "btn_back":
+            self.app.pop_screen()
+
+    def on_user_selected(self, user_data: dict | None):
+        if user_data:
+            self.selected_user_id = user_data['id']
+            self.query_one("#filter_user_name", Input).value = user_data['username']
+        else:
+            self.selected_user_id = None
+            self.query_one("#filter_user_name", Input).value = "Todos"
+        self.refresh_report()
+
+class UserSelectionDialog(Screen):
+    """Diálogo para seleccionar un usuario de la lista."""
+    def compose(self) -> ComposeResult:
+        yield Label("SELECCIONAR USUARIO", id="modal_title")
+        yield Input(placeholder="Filtrar por nombre de usuario...", id="filter_user_input")
+        yield DataTable(id="user_selection_table")
+        with Horizontal(classes="form-buttons"):
+            yield Button("Seleccionar", "success", id="btn_select_user_dialog")
+            yield Button("Cancelar", "error", id="btn_cancel_user_dialog")
+            yield Button("Limpiar Selección", "warning", id="btn_clear_user_selection")
+
+    def on_mount(self) -> None:
+        self.query_one("#user_selection_table").add_columns("ID", "Usuario", "Rol")
+        self.refresh_user_list()
+        self.query_one("#user_selection_table").cursor_type = "row"
+
+    def refresh_user_list(self, filter_text: str = ""):
+        table = self.query_one("#user_selection_table")
+        table.clear()
+        users = database.get_all_users()
+        for u in users:
+            if filter_text.lower() in u['username'].lower():
+                table.add_row(str(u['id']), u['username'], u['role'], key=str(u['id']))
+        table.focus() # Enfocar la tabla para navegación con flechas
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "filter_user_input":
+            self.refresh_user_list(event.value)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_select_user_dialog":
+            table = self.query_one("#user_selection_table")
+            if table.row_count > 0 and table.cursor_row < table.row_count:
+                user_id = int(table.get_cell_at((table.cursor_row, 0)))
+                user = database.get_user_by_id(user_id)
+                self.dismiss(user)
+            else:
+                self.app.notify("Selecciona un usuario o cancela.", severity="warning")
+        elif event.button.id == "btn_clear_user_selection":
+            self.dismiss(None) # Devuelve None para indicar que no hay selección
+        elif event.button.id == "btn_cancel_user_dialog":
+            self.dismiss(None)
+
+class ReportsMenuScreen(Screen):
+    BINDINGS = [Binding("escape", "app.pop_screen", "Volver")]
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("ROLIK - CENTRO DE REPORTES", id="section_title")
+        
+        with VerticalScroll(id="report_menu_container"):
+            with Horizontal(classes="report-row"):
+                yield Button("Ventas de Hoy", variant="primary", id="btn_rep_today")
+                yield Button("Ventas por Rango / Ganancias", variant="primary", id="btn_rep_range")
+            
+            with Horizontal(classes="report-row"):
+                yield Button("Ventas por Producto", variant="primary", id="btn_rep_prod")
+                yield Button("Top 10 Más Vendidos", variant="primary", id="btn_rep_top")
+            
+            with Horizontal(classes="report-row"):
+                yield Button("Bajo Stock / Reabastecer", variant="warning", id="btn_rep_stock")
+                yield Button("Kardex (Movimientos)", variant="warning", id="btn_rep_kardex")
+            
+            with Horizontal(classes="report-row"):
+                yield Button("Historial de Recibos", variant="success", id="btn_rep_receipts")
+                yield Button("Ventas por Vendedor", variant="success", id="btn_rep_sellers")
+            
+            with Horizontal(classes="report-row"):
+                yield Button("Volver al Menú", variant="error", id="btn_back")
+        yield Footer()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_rep_today":
+            self.app.push_screen(DailySalesReportScreen())
+        elif event.button.id == "btn_rep_range":
+            self.app.push_screen(FinancialReportScreen())
+        elif event.button.id == "btn_rep_prod":
+            self.app.push_screen(ProductSalesReportScreen())
+        elif event.button.id == "btn_rep_stock":
+            self.app.push_screen(LowStockReportScreen())
+        elif event.button.id == "btn_rep_kardex":
+            self.app.push_screen(KardexReportScreen())
+        elif event.button.id == "btn_rep_top":
+            self.app.push_screen(TopProductsReportScreen())
+        elif event.button.id == "btn_rep_receipts":
+            self.app.push_screen(SalesHistoryReportScreen())
+        elif event.button.id == "btn_rep_sellers":
+            self.app.push_screen(SalesReportScreen())
+        elif event.button.id == "btn_back":
+            self.app.pop_screen()
+
+# --- PANTALLAS DE REPORTES ESPECÍFICOS ---
+
+class ProductSalesReportScreen(Screen):
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("REPORTE DE VENTAS POR PRODUCTO", id="section_title")
+        with Horizontal(id="filter_bar"):
+            yield Input(placeholder="Inicio YYYY-MM-DD", id="rep_start")
+            yield Input(placeholder="Fin YYYY-MM-DD", id="rep_end")
+            yield Button("Filtrar", variant="success", id="btn_filter")
+        yield DataTable(id="product_sales_table")
+        yield Button("Cerrar", variant="error", id="btn_close")
+        yield Footer()
+
+    def on_mount(self):
+        table = self.query_one(DataTable)
+        table.add_columns("Producto", "Cant. Vendida", "Total Generado", "Margen Ganancia")
+        table.cursor_type = "row"
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_filter":
+            start = self.query_one("#rep_start").value
+            end = self.query_one("#rep_end").value
+            table = self.query_one(DataTable)
+            table.clear()
+            for p in database.get_report_sales_by_product(start, end):
+                table.add_row(
+                    p['nombre'], 
+                    str(p['cant_vendida']), 
+                    f"S/ {p['total_generado']:.2f}", 
+                    f"S/ {p['margen_ganancia']:.2f}"
+                )
+        else:
+            self.app.pop_screen()
+
+class DailySalesReportScreen(Screen):
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("RESUMEN DE VENTAS DEL DÍA", id="section_title")
+        yield Static(id="daily_stats", classes="report-summary-box")
+        yield Button("Cerrar", variant="error", id="btn_close")
+        yield Footer()
+
+    def on_mount(self):
+        data = database.get_report_daily_sales()
+        if data:
+            stats = f"""
+TOTAL TRANSACCIONES: {data['total_transacciones']}
+-------------------------------------------
+MONTO TOTAL VENDIDO: S/ {data['monto_total'] or 0.0:.2f}
+-------------------------------------------
+PAGOS EN EFECTIVO:   S/ {data['efectivo'] or 0.0:.2f}
+PAGOS EN TARJETA:    S/ {data['tarjeta'] or 0.0:.2f}
+OTROS MEDIOS:        S/ {data['otros'] or 0.0:.2f}
+"""
+            self.query_one("#daily_stats").update(stats)
+
+    def on_button_pressed(self, event: Button.Pressed):
+        self.app.pop_screen()
+
+class FinancialReportScreen(Screen):
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("REPORTE FINANCIERO Y GANANCIAS", id="section_title")
+        with Horizontal(id="filter_bar"):
+            yield Input(placeholder="Inicio YYYY-MM-DD", id="rep_start")
+            yield Input(placeholder="Fin YYYY-MM-DD", id="rep_end")
+            yield Button("Calcular", variant="success", id="btn_calc")
+        yield Static(id="finance_results", classes="report-summary-box")
+        yield Button("Cerrar", variant="error", id="btn_close")
+        yield Footer()
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_calc":
+            start = self.query_one("#rep_start").value
+            end = self.query_one("#rep_end").value
+            data = database.get_report_sales_by_range(start, end)
+            if data:
+                res = f"""
+INGRESOS BRUTOS:     S/ {data['ingresos_brutos'] or 0.0:.2f}
+TOTAL IGV (18%):     S/ {data['total_igv'] or 0.0:.2f}
+TOTAL NETO:          S/ {data['total_neto'] or 0.0:.2f}
+-------------------------------------------
+GANANCIA ESTIMADA:   S/ {data['ganancia_estimada'] or 0.0:.2f}
+(Venta - Costo Compra)
+"""
+                self.query_one("#finance_results").update(res)
+        else:
+            self.app.pop_screen()
+
+class LowStockReportScreen(Screen):
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("PRODUCTOS CON BAJO STOCK (ALERTA)", id="section_title")
+        yield DataTable(id="low_stock_table")
+        yield Button("Cerrar", variant="error", id="btn_close")
+        yield Footer()
+
+    def on_mount(self):
+        table = self.query_one(DataTable)
+        table.add_columns("Código", "Producto", "Stock Actual", "Mínimo", "Faltante")
+        for p in database.get_report_low_stock():
+            table.add_row(p['codigo'], p['nombre'], str(p['stock']), str(p['stock_minimo']), str(p['faltante']))
+
+    def on_button_pressed(self, event: Button.Pressed):
+        self.app.pop_screen()
+
+class KardexReportScreen(Screen):
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("KARDEX - HISTORIAL DE MOVIMIENTOS", id="section_title")
+        yield Label("(Presione ENTER sobre una VENTA para ver su recibo)", classes="help-text")
+        yield DataTable(id="kardex_table")
+        yield Button("Cerrar", variant="error", id="btn_close")
+        yield Footer()
+
+    def on_mount(self):
+        table = self.query_one(DataTable)
+        table.add_columns("Fecha", "Tipo", "Producto", "Cant.", "Precio Ref.", "Ref_ID")
+        table.cursor_type = "row"
+        for m in database.get_report_kardex():
+            table.add_row(
+                str(m['date'])[:16], 
+                m['tipo'], 
+                m['producto_codigo'], 
+                str(m['cant']), 
+                f"S/ {m['precio']:.2f}",
+                str(m['ref_id']),
+                key=f"{m['tipo']}_{m['ref_id']}"
+            )
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected):
+        key_parts = str(event.row_key.value).split("_")
+        tipo = key_parts[0]
+        ref_id = int(key_parts[1])
+        if "VENTA" in tipo:
+            self.app.push_screen(ViewReceiptDialog(ref_id))
+        else:
+            self.app.notify("Este movimiento es una compra (OC).", severity="information")
+
+    def on_button_pressed(self, event: Button.Pressed):
+        self.app.pop_screen()
+
+class TopProductsReportScreen(Screen):
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("TOP 10 PRODUCTOS MÁS VENDIDOS", id="section_title")
+        yield DataTable(id="top_table")
+        yield Button("Cerrar", variant="error", id="btn_close")
+        yield Footer()
+
+    def on_mount(self):
+        table = self.query_one(DataTable)
+        table.add_columns("Ranking", "Producto", "Cantidad Vendida")
+        for i, p in enumerate(database.get_report_top_products(), 1):
+            table.add_row(str(i), p['nombre'], str(p['total_qty']))
+
+    def on_button_pressed(self, event: Button.Pressed):
+        self.app.pop_screen()
+
+class SalesHistoryReportScreen(Screen):
+    """Muestra la lista de todos los comprobantes de venta generados."""
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("HISTORIAL DE COMPROBANTES GENERADOS", id="section_title")
+        yield DataTable(id="sales_history_table")
+        with Horizontal(classes="form-buttons"):
+            yield Button("Ver Recibo (V)", variant="primary", id="btn_view_receipt")
+            yield Button("Editar Recibo (E)", variant="warning", id="btn_edit_receipt")
+            yield Button("Cerrar", variant="error", id="btn_close")
+        yield Footer()
+
+    def on_mount(self):
+        table = self.query_one(DataTable)
+        table.add_columns("Fecha", "Comprobante", "Cliente", "Total", "ID")
+        table.cursor_type = "row"
+        self.refresh_list()
+
+    def refresh_history(self):
+        table = self.query_one(DataTable)
+        table.clear()
+        sales = database.get_sales_history()
+        for s in sales:
+            conn = database.get_connection()
+            extra = conn.execute("SELECT tipo_comprobante, correlativo, cliente_nombre FROM transactions WHERE id = ?", (s['transaction_id'],)).fetchone()
+            conn.close()
+            
+            comp = f"{extra['tipo_comprobante']} {extra['correlativo']}" if extra else "TICKET"
+            # Corregido: Manejamos el caso donde cliente_nombre sea None
+            cliente_raw = extra['cliente_nombre'] if (extra and extra['cliente_nombre']) else "P. GENERAL"
+            cliente_display = str(cliente_raw)[:20]
+            
+            table.add_row(
+                str(s['transaction_date'])[:16],
+                comp,
+                cliente_display,
+                f"S/ {s['transaction_total']:.2f}",
+                str(s['transaction_id']),
+                key=str(s['transaction_id'])
+            )
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_view_receipt":
+            self.action_view_receipt()
+        elif event.button.id == "btn_edit_receipt":
+            self.action_edit_receipt()
+        else:
+            self.app.pop_screen()
+
+    def action_view_receipt(self):
+        try:
+            table = self.query_one(DataTable)
+            trans_id = int(table.get_cell_at((table.cursor_row, 4)))
+            self.app.push_screen(ViewReceiptDialog(trans_id))
+        except Exception:
+            self.app.notify("Seleccione una venta.", severity="error")
+
+    def action_edit_receipt(self):
+        try:
+            table = self.query_one(DataTable)
+            trans_id = int(table.get_cell_at((table.cursor_row, 4)))
+            self.app.push_screen(EditSaleScreen(trans_id), lambda success: self.refresh_history() if success else None)
+        except Exception:
+            self.app.notify("Seleccione una venta para editar.", severity="error")
+
+    def refresh_list(self):
+        self.refresh_history()
+
+class EditSaleScreen(Screen):
+    """Pantalla para editar una venta ya realizada."""
+    def __init__(self, transaction_id):
+        super().__init__()
+        self.trans_id = transaction_id
+        self.cart = {}
+        self.total = 0.0
+        self.discount_percentage = 0
+        self.orig_pay_data = {}
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label(f"EDITAR VENTA ID: {self.trans_id}", id="section_title")
+        with Horizontal():
+            with Vertical(id="pos_left"):
+                yield Label("Añadir/Buscar más productos:")
+                yield Input(id="edit_pos_search", placeholder="Código o nombre...")
+                yield DataTable(id="edit_pos_table")
+            with Vertical(id="pos_right"):
+                yield Label("RESUMEN DE EDICIÓN", classes="section_title")
+                yield Static("SUBTOTAL: S/ 0.00", id="edit_subtotal_label")
+                yield Static("TOTAL: S/ 0.00", id="edit_total_label")
+                yield Button("Guardar Cambios (F2)", variant="success", id="btn_save_edit")
+                yield Button("Eliminar Item", variant="error", id="btn_del_item_edit")
+                yield Button("Cancelar", variant="error", id="btn_cancel_edit")
+        yield Footer()
+
+    def on_mount(self):
+        table = self.query_one("#edit_pos_table")
+        table.add_columns("Código", "Producto", "Cant.", "P.Unit", "Subtotal")
+        table.cursor_type = "row"
+        
+        # Cargar datos actuales de la venta
+        sale, items = database.get_sale_full_details(self.trans_id)
+        if sale:
+            self.orig_pay_data = dict(sale)
+            for item in items:
+                # Estructura carrito: [nombre, qty, price, stock, marca, unidad]
+                self.cart[item['codigo']] = [
+                    item['nombre'], item['quantity'], item['unit_price'], 
+                    item['stock'], item['fabricante'], item['unidad']
+                ]
+            self.refresh_edit_table()
+
+    def on_input_submitted(self, event: Input.Submitted):
+        if event.input.id == "edit_pos_search":
+            term = event.value.strip()
+            if term:
+                # Reutilizamos lógica de búsqueda del POS (handle_search se puede mover a un mixin o helper si fuera necesario, pero por ahora lo duplicamos simplificado)
+                prod = database.get_product(term) or database.get_product_by_name(term)
+                if prod:
+                    self.app.push_screen(QuantityDialog(prod), lambda qty: self.add_to_edit_cart(prod, qty) if qty else None)
+                event.input.value = ""
+
+    def add_to_edit_cart(self, prod, qty):
+        code = prod['codigo']
+        if code in self.cart: self.cart[code][1] += qty
+        else: self.cart[code] = [prod['nombre'], qty, prod['precio_venta'], prod['stock'], prod['fabricante'], prod['unidad']]
+        self.refresh_edit_table()
+
+    def refresh_edit_table(self):
+        table = self.query_one("#edit_pos_table")
+        table.clear()
+        subtotal = 0.0
+        for code, data in self.cart.items():
+            item_sub = data[1] * data[2]
+            subtotal += item_sub
+            table.add_row(code, data[0], str(data[1]), f"S/ {data[2]:.2f}", f"S/ {item_sub:.2f}")
+        
+        self.total = subtotal
+        self.query_one("#edit_subtotal_label").update(f"SUBTOTAL: S/ {subtotal:.2f}")
+        self.query_one("#edit_total_label").update(f"TOTAL: S/ {self.total:.2f}")
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_save_edit":
+            self.app.push_screen(PaymentDialog(self.total), self.save_changes)
+        elif event.button.id == "btn_del_item_edit":
+            try:
+                table = self.query_one("#edit_pos_table")
+                code = table.get_cell_at((table.cursor_row, 0))
+                if code in self.cart:
+                    del self.cart[code]
+                    self.refresh_edit_table()
+            except Exception: pass
+        elif event.button.id == "btn_cancel_edit":
+            self.dismiss(False)
+
+    def save_changes(self, new_pay_data):
+        if new_pay_data:
+            items = [(code, data[1], data[2]) for code, data in self.cart.items()]
+            try:
+                database.update_sale(self.trans_id, self.total, items, new_pay_data)
+                self.app.notify("Venta actualizada y stock recalculado.", severity="success")
+                self.dismiss(True)
+            except Exception as e:
+                self.app.notify(f"Error al actualizar: {e}")
+
+class ViewReceiptDialog(Screen):
+    """Ventana para visualizar un recibo guardado en el historial."""
+    def __init__(self, transaction_id):
+        super().__init__()
+        self.trans_id = transaction_id
+        self.receipt_content = ""
+        self.correlativo = ""
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal-container", id="receipt-view-dialog"):
+            yield Label("VISUALIZACIÓN DE COMPROBANTE", id="modal_title")
+            yield Static(id="receipt_content", classes="receipt-text-area")
+            with Horizontal(classes="form-buttons"):
+                yield Button("Imprimir Recibo", variant="success", id="btn_print_receipt")
+                yield Button("Cerrar", variant="error", id="btn_close_view")
+
+    def on_mount(self):
+        sale, items = database.get_sale_full_details(self.trans_id)
+        if sale:
+            self.correlativo = sale.get('correlativo', f"ID_{self.trans_id}")
+            self.receipt_content = self.formatear_recibo(sale, items)
+            self.query_one("#receipt_content").update(self.receipt_content)
+
+    def formatear_recibo(self, sale, items):
+        width = 42
+        t = f"{'='*width}\n{'FERRETERIA ROLIK':^{width}}\n"
+        t += f"{'RUC: 10440809320':^{width}}\n"
+        t += f"{'CEL: 988352912 / 932326764':^{width}}\n"
+        t += f"{'MZ A LT 26 P.I. MADERA KM 15.5':^{width}}\n"
+        t += f"{'='*width}\n"
+        t += f"COMPROBANTE: {sale['tipo_comprobante']}\n"
+        t += f"NUMERO:      {sale['correlativo']}\n"
+        t += f"FECHA:       {sale['date']}\n{'-'*width}\n"
+        t += f"{'CANT':<5} {'DESCRIPCION':<24} {'TOTAL':>10}\n{'-'*width}\n"
+        for item in items:
+            sub = item['quantity'] * item['unit_price']
+            desc = f"{item['nombre'][:20]} ({str(item['fabricante'] or '')[:3]})"
+            t += f"{item['quantity']:<5} {desc:<24} {sub:>10.2f}\n"
+        t += f"{'-'*width}\n{'TOTAL PAGADO:':<28} S/ {sale['total']:>10.2f}\n"
+        t += f"METODO PAGO: {sale['metodo_pago']}\n{'='*width}\n"
+        return t
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_print_receipt":
+            self.imprimir_recibo_archivo()
+        else:
+            self.dismiss()
+
+    def imprimir_recibo_archivo(self):
+        """Guarda el recibo actual en un archivo .txt."""
+        if not self.receipt_content:
+            self.app.notify("No hay contenido de recibo para imprimir.", severity="error")
+            return
+        try:
+            filename = f"Ticket_{self.correlativo}.txt"
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(self.receipt_content)
+            
+            self.app.notify(f"Recibo guardado: {filename}", severity="information")
+            if os.name == 'nt':
+                os.startfile(filename)
+        except Exception as e:
+            self.app.notify(f"Error al imprimir: {e}", severity="error")
+
+class CommissionReportScreen(Screen):
+    BINDINGS = [Binding("escape", "app.pop_screen", "Volver"), ("r", "refresh_report", "Refrescar")]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.selected_user_id = None
+        self.start_date = ""
+        self.end_date = ""
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label("REPORTE DE COMISIONES", id="section_title")
+        with Horizontal(id="report_filters"):
+            yield Label("Vendedor:")
+            yield Input(placeholder="Todos", id="filter_seller_name", classes="filter-input")
+            yield Button("Seleccionar Vendedor", id="btn_select_seller")
+            yield Label("Desde (YYYY-MM-DD):")
+            yield Input(placeholder="YYYY-MM-DD", id="filter_start_date", classes="filter-input")
+            yield Label("Hasta (YYYY-MM-DD):")
+            yield Input(placeholder="YYYY-MM-DD", id="filter_end_date", classes="filter-input")
+            yield Button("Refrescar (R)", id="btn_refresh_report")
+        yield DataTable(id="commissions_report_table")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        table = self.query_one(DataTable)
+        table.cursor_type = "row"
+        table.add_columns("ID Comisión", "Fecha", "Monto Comisión", "Vendedor", "ID Venta", "Total Venta")
+        self.refresh_report()
+
+    def refresh_report(self):
+        try:
+            start_date = self.query_one("#filter_start_date", Input).value
+            end_date = self.query_one("#filter_end_date", Input).value
+            
+            table = self.query_one(DataTable)
+            table.clear()
+
+            commissions = database.get_commissions_history(
+                user_id=self.selected_user_id,
+                start_date=start_date if start_date else None,
+                end_date=end_date if end_date else None
+            )
+
+            total_commissions_amount = 0.0
+            for comm in commissions:
+                table.add_row(
+                    str(comm['commission_id']),
+                    str(comm['commission_date']),
+                    f"${comm['commission_amount']:.2f}",
+                    str(comm['seller_name']),
+                    str(comm['transaction_id']),
+                    f"${comm['transaction_total']:.2f}"
+                )
+                total_commissions_amount += comm['commission_amount']
+            
+            table.add_row("", "", "", "", "", "", key="total-row", classes="footer")
+            table.add_row("TOTAL COMISIONES:", "", "", "", "", f"${total_commissions_amount:.2f}", key="total-row-val", classes="footer")
+
+        except Exception as e:
+            self.app.notify(f"Error al cargar el reporte de comisiones: {e}", severity="error")
+
+    def action_refresh_report(self):
+        self.refresh_report()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn_refresh_report":
+            self.refresh_report()
+        elif event.button.id == "btn_select_seller":
+            self.app.push_screen(UserSelectionDialog(), callback=self.on_seller_selected)
+        elif event.button.id == "btn_back":
+            self.app.pop_screen()
+
+    def on_seller_selected(self, user_data: dict | None):
+        if user_data:
+            self.selected_user_id = user_data['id']
+            self.query_one("#filter_seller_name", Input).value = user_data['username']
+        else:
+            self.selected_user_id = None
+            self.query_one("#filter_seller_name", Input).value = "Todos"
+        self.refresh_report()
+
+class PurchaseOrderListScreen(Screen):
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Volver"),
+        Binding("n", "create_po", "Nuevo Pedido"),
+        Binding("r", "receive_po", "Recibir Pedido"),
+        Binding("v", "view_po", "Ver Detalle"),
+        Binding("s", "change_status", "Cambiar Estado")
+    ]
+    
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Vertical(
+            Label("ROLIK - ÓRDENES DE COMPRA", id="section_title"),
+            DataTable(id="po_table"),
+            Horizontal(
+                Button("Nuevo (N)", variant="success", id="btn_new"), 
+                Button("Ver Detalle (V)", variant="primary", id="btn_view"),
+                Button("Cambiar Estado (S)", variant="warning", id="btn_status"),
+                Button("Recibir (R)", variant="warning", id="btn_receive"),
+                Button("Volver (ESC)", variant="error", id="btn_back"), 
+                id="po_actions"))
+        yield Footer()
+    
+    def on_mount(self):
+        table = self.query_one(DataTable)
+        table.cursor_type = "row"
+        table.add_columns("ID", "NÚMERO OC", "PROVEEDOR", "FECHA PEDIDO", "FECHA EST.", "ESTADO", "TOTAL")
+        self.refresh_pos()
+    
+    def refresh_pos(self):
+        table = self.query_one(DataTable)
+        table.clear()
+        for order in database.get_all_purchase_orders():
+            # numero_oc es el nuevo campo robusto
+            table.add_row(
+                str(order['id']), 
+                str(order['numero_oc'] or "N/A"),
+                order['proveedor'], 
+                str(order['fecha_pedido'])[:10],
+                str(order['fecha_estimada'] or "N/A"),
+                order['estado'],
+                f"${order['total']:.2f}"
+            )
+    
+    def action_view_po(self):
+        try:
+            table = self.query_one(DataTable)
+            order_id = int(table.get_cell_at((table.cursor_row, 0)))
+            self.app.push_screen(ViewPODetailsScreen(order_id))
+        except Exception:
+            self.app.notify("Selecciona una orden para ver detalles.", severity="error")
+
+    def action_change_status(self):
+        try:
+            table = self.query_one(DataTable)
+            order_id = int(table.get_cell_at((table.cursor_row, 0)))
+            self.app.push_screen(ChangeStatusDialog(order_id), lambda success: self.refresh_pos() if success else None)
+        except Exception:
+            self.app.notify("Selecciona una orden para cambiar su estado.", severity="error")
+    
+    def on_po_created(self, success: bool):
+        if success: self.refresh_pos(); self.app.notify("Orden de compra creada.", severity="success")
+    
+    def action_create_po(self): self.app.push_screen(CreatePurchaseOrderScreen(), self.on_po_created)
+    
+    def action_receive_po(self):
+        try:
+            table = self.query_one(DataTable); order_id = table.get_cell_at((table.cursor_row, 0))
+            estado = table.get_cell_at((table.cursor_row, 3))
+            if estado == "RECIBIDO": self.app.notify("Esta orden ya ha sido recibida.", severity="warning"); return
+            database.receive_purchase_order(order_id)
+            self.app.notify(f"Orden #{order_id} recibida. Stock actualizado.", severity="success"); self.refresh_pos()
+            self.app.query_one(InventoryScreen).refresh_inventory() # Actualizar inventario si está montado
+        except Exception: self.app.notify("Selecciona una orden de la tabla para recibir.", severity="error")
+    
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_new": self.action_create_po()
+        elif event.button.id == "btn_receive": self.action_receive_po()
+        elif event.button.id == "btn_back": self.app.pop_screen()
+
+class ChangeStatusDialog(Screen):
+    def __init__(self, order_id):
+        super().__init__(); self.order_id = order_id
+    
+    def compose(self) -> ComposeResult:
+        order = database.get_purchase_order_by_id(self.order_id)
+        with Vertical(classes="modal-container"):
+            yield Label(f"CAMBIAR ESTADO - ORDEN {order['numero_oc']}")
+            if order['estado'] in ["RECIBIDA", "RECIBIDO"]:
+                yield Label("ESTADO BLOQUEADO: La orden ya fue RECIBIDA.", classes="error")
+                yield Button("Cerrar", id="btn_cancel")
+            else:
+                yield Button("PENDIENTE", id="PENDIENTE")
+                yield Button("APROBADA", id="APROBADA")
+                yield Button("ENVIADA", id="ENVIADA")
+                yield Button("RECIBIDA (ACTUALIZA STOCK)", id="RECIBIDA", variant="warning")
+                yield Button("CANCELADA", id="CANCELADA", variant="error")
+                yield Button("Cancelar", id="btn_cancel")
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_cancel":
+            self.dismiss(False)
+        else:
+            database.update_purchase_order_status(self.order_id, event.button.id)
+            self.app.notify(f"Estado actualizado a {event.button.id}")
+            self.dismiss(True)
+
+class ViewPODetailsScreen(Screen):
+    def __init__(self, order_id):
+        super().__init__(); self.order_id = order_id
+        self.order_data = None
+    
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Label(f"DETALLE DE ORDEN DE COMPRA", id="section_title")
+        yield Static(id="po_header_info", classes="po-details-text")
+        yield DataTable(id="po_details_table")
+        yield Static(id="po_footer_info", classes="po-details-text")
+        with Horizontal(classes="form-buttons"):
+            yield Button("Exportar TXT", variant="primary", id="btn_export_txt")
+            yield Button("Exportar PDF", variant="success", id="btn_export_pdf")
+            yield Button("Cerrar (ESC)", variant="error", id="btn_close")
+        yield Footer()
+
+    def on_mount(self):
+        order = database.get_purchase_order_by_id(self.order_id)
+        self.order_data = order
+        details = database.get_purchase_order_details(self.order_id)
+        
+        self.query_one("#section_title").update(f"DETALLE DE ORDEN: {order['numero_oc']}")
+        
+        header = f"""
+NÚMERO OC: {order['numero_oc']} | FECHA: {order['fecha_pedido']}
+PROVEEDOR: {order['proveedor_nombre']} | RUC: {order['ruc_dni'] or 'N/A'}
+DIRECCIÓN: {order['direccion'] or 'N/A'} | TEL: {order['telefono'] or 'N/A'}
+ESTADO: {order['estado']} | PAGO: {order['condicion_pago'] or 'N/A'}
+FECHA ESTIMADA: {order['fecha_estimada'] or 'N/A'} | LUGAR: {order['lugar_entrega'] or 'N/A'}
+"""
+        self.query_one("#po_header_info").update(header)
+        
+        table = self.query_one("#po_details_table")
+        table.add_columns("Producto", "Cantidad", "P. Unit", "Subtotal")
+        for item in details:
+            sub = item['cantidad'] * item['precio_compra_unitario']
+            table.add_row(item['nombre'], str(item['cantidad']), f"${item['precio_compra_unitario']:.2f}", f"${sub:.2f}")
+        
+        footer = f"""
+SUBTOTAL: ${order['subtotal']:.2f} | IGV (18%): ${order['igv']:.2f} | TOTAL: ${order['total']:.2f}
+"""
+        self.query_one("#po_footer_info").update(footer)
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_export_txt":
+            self.export_to_txt()
+        elif event.button.id == "btn_export_pdf":
+            self.export_to_pdf()
+        elif event.button.id == "btn_close":
+            self.app.pop_screen()
+
+    def export_to_txt(self):
+        try:
+            o = self.order_data
+            details = database.get_purchase_order_details(self.order_id)
+            filename = f"Orden_{o['numero_oc']}.txt"
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(f"FERRETERIA ROLIK\n")
+                f.write(f"RUC: 10440809320 | MZ A LT 26 P.I. MADERA\n")
+                f.write("-" * 50 + "\n")
+                f.write(f"ORDEN DE COMPRA: {o['numero_oc']}\n")
+                f.write(f"Fecha: {o['fecha_pedido']}\n")
+                f.write(f"Proveedor: {o['proveedor_nombre']} | RUC: {o['ruc_dni']}\n")
+                f.write("-" * 50 + "\n")
+                for d in details:
+                    sub = d['cantidad'] * d['precio_compra_unitario']
+                    f.write(f"{d['nombre'][:30]:<30} | {d['cantidad']:<5} | ${d['precio_compra_unitario']:>8.2f} | ${sub:>8.2f}\n")
+                f.write("-" * 50 + "\n")
+                f.write(f"SUBTOTAL: ${o['subtotal']:>38.2f}\n")
+                f.write(f"IGV (18%): ${o['igv']:>38.2f}\n")
+                f.write(f"TOTAL: ${o['total']:>41.2f}\n")
+                f.write(f"Estado: {o['estado']}\n")
+            self.app.notify(f"Archivo TXT generado: {filename}", severity="information")
+        except Exception as e:
+            self.app.notify(f"Error al exportar TXT: {e}", severity="error")
+
+    def export_to_pdf(self):
+        try:
+            order = self.order_data
+            details = database.get_purchase_order_details(self.order_id)
+            
+            pdf = FPDF()
+            pdf.add_page()
+            
+            # Comprador
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(0, 10, "FERRETERIA ROLIK", ln=True)
+            pdf.set_font("Arial", "", 10)
+            pdf.cell(0, 5, "RUC: 10440809320 | Cel: 988352912/932326764", ln=True)
+            pdf.cell(0, 5, "Mz A lt 26 Parque industrial de la madera km 15.5", ln=True)
+            pdf.ln(5)
+            
+            # Encabezado
+            pdf.set_font("Arial", "B", 16)
+            pdf.cell(0, 10, f"ORDEN DE COMPRA {order['numero_oc']}", ln=True, align="C")
+            pdf.ln(5)
+            
+            # Datos del Proveedor y Orden
+            pdf.set_font("Arial", "", 10)
+            pdf.cell(0, 7, f"Proveedor: {order['proveedor_nombre']}", ln=True)
+            pdf.cell(0, 7, f"RUC/DNI: {order['ruc_dni'] or 'N/A'}", ln=True)
+            pdf.cell(0, 7, f"Direccion: {order['direccion'] or 'N/A'}", ln=True)
+            pdf.cell(0, 7, f"Telefono: {order['telefono'] or 'N/A'}", ln=True)
+            pdf.ln(3)
+            pdf.cell(0, 7, f"Fecha Pedido: {order['fecha_pedido']}", ln=True)
+            pdf.cell(0, 7, f"Condicion Pago: {order['condicion_pago'] or 'N/A'}", ln=True)
+            pdf.cell(0, 7, f"Lugar Entrega: {order['lugar_entrega'] or 'N/A'}", ln=True)
+            pdf.ln(10)
+            
+            # Tabla de Productos
+            pdf.set_font("Arial", "B", 10)
+            pdf.set_fill_color(200, 220, 255)
+            pdf.cell(80, 10, "Producto", border=1, fill=True)
+            pdf.cell(30, 10, "Cant.", border=1, fill=True, align="C")
+            pdf.cell(40, 10, "Precio Unit.", border=1, fill=True, align="C")
+            pdf.cell(40, 10, "Subtotal", border=1, fill=True, align="C")
+            pdf.ln()
+            
+            pdf.set_font("Arial", "", 10)
+            for item in details:
+                sub = item['cantidad'] * item['precio_compra_unitario']
+                pdf.cell(80, 8, item['nombre'][:40], border=1)
+                pdf.cell(30, 8, str(item['cantidad']), border=1, align="C")
+                pdf.cell(40, 8, f"${item['precio_compra_unitario']:.2f}", border=1, align="C")
+                pdf.cell(40, 8, f"${sub:.2f}", border=1, align="C")
+                pdf.ln()
+            
+            # Totales
+            pdf.ln(5)
+            pdf.set_font("Arial", "B", 11)
+            pdf.cell(150, 8, "SUBTOTAL:", align="R"); pdf.cell(40, 8, f"${order['subtotal']:.2f}", border=1, align="C"); pdf.ln()
+            pdf.cell(150, 8, "IGV (18%):", align="R"); pdf.cell(40, 8, f"${order['igv']:.2f}", border=1, align="C"); pdf.ln()
+            pdf.set_fill_color(255, 230, 150)
+            pdf.cell(150, 8, "TOTAL FINAL:", align="R"); pdf.cell(40, 8, f"${order['total']:.2f}", border=1, fill=True, align="C"); pdf.ln()
+            
+            filename = f"Orden_Compra_{order['numero_oc']}.pdf"
+            pdf.output(filename)
+            self.app.notify(f"PDF generado: {filename}", severity="information")
+            if os.name == 'nt': os.startfile(filename)
+        except Exception as e:
+            self.app.notify(f"Error al exportar PDF: {e}", severity="error")
+
+class CreatePurchaseOrderScreen(Screen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs); self.po_items = {}
+    
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with VerticalScroll(id="po-form-scroll"):
+            yield Label("NUEVA ORDEN DE COMPRA", id="modal_title")
+            
+            with Horizontal(classes="po-row"):
+                with Vertical(classes="po-col"):
+                    yield Label("Proveedor:"); yield Input(id="in_proveedor_po")
+                    yield Label("RUC Proveedor (11 dígitos):"); yield Input(id="in_ruc_po", restrict=r"[0-9]*")
+                    yield Label("Fecha Est. Entrega:"); yield Input(placeholder="YYYY-MM-DD", id="in_po_delivery_date")
+                with Vertical(classes="po-col"):
+                    yield Label("Condición Pago:"); yield Input(placeholder="Contado/Crédito", id="in_po_payment")
+                    yield Label("Lugar Entrega:"); yield Input(id="in_po_place")
+            
+            yield Label("AÑADIR PRODUCTOS", classes="sub-title")
+            with Horizontal(id="po-product-adder"):
+                yield Input(placeholder="Código o Nombre del Producto", id="in_po_search", classes="input-search")
+                yield Input(placeholder="Cant.", id="in_po_qty", restrict=r"[0-9]*", classes="input-small")
+                yield Input(placeholder="Costo U.", id="in_po_cost", restrict=r"[0-9.]*", classes="input-small")
+                yield Button("Añadir", variant="primary", id="btn_add_item")
+            
+            yield DataTable(id="po_items_table")
+            
+            with Horizontal(classes="form-buttons-po"):
+                yield Button("CREAR ORDEN", variant="success", id="btn_create_po")
+                yield Button("CANCELAR", variant="error", id="btn_cancel_po")
+        yield Footer()
+    
+    def on_mount(self): 
+        self.query_one("#po_items_table").add_columns("Código", "Cant.", "Costo", "Producto")
+    
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_add_item":
+            search_term = self.query_one("#in_po_search", Input).value.strip()
+            qty_str = self.query_one("#in_po_qty", Input).value.strip()
+            cost_str = self.query_one("#in_po_cost", Input).value.strip()
+            
+            if not (search_term and qty_str and cost_str):
+                self.app.notify("Búsqueda, Cantidad y Costo son requeridos.", severity="error")
+                return
+            
+            try:
+                qty = int(qty_str)
+                cost = float(cost_str)
+                if qty <= 0 or cost <= 0:
+                    self.app.notify("Cantidad y costo deben ser mayores a cero.", severity="error")
+                    return
+            except ValueError:
+                self.app.notify("Cantidad (entero) y Costo (decimal) deben ser números válidos.", severity="error")
+                return
+            
+            # 1. Intentar buscar por código
+            product = database.get_product(search_term)
+            
+            # 2. Si no se encuentra por código, intentar por nombre
+            if not product:
+                product = database.get_product_by_name(search_term)
+            
+            if not product:
+                self.app.notify(f"Producto '{search_term}' no encontrado (por código ni nombre).", severity="error")
+                return
+            
+            code = product['codigo']
+            # Añadir al diccionario local y refrescar tabla
+            self.po_items[code] = [product['nombre'], qty, cost]
+            self.refresh_po_items_table()
+            
+            # Limpiar campos de producto para el siguiente
+            self.query_one("#in_po_search", Input).value = ""
+            self.query_one("#in_po_qty", Input).value = ""
+            self.query_one("#in_po_cost", Input).value = ""
+            self.query_one("#in_po_search", Input).focus()
+            
+        elif event.button.id == "btn_create_po":
+            proveedor = self.query_one("#in_proveedor_po").value
+            ruc = self.query_one("#in_ruc_po").value
+            if not proveedor or not ruc or not self.po_items:
+                self.app.notify("Proveedor, RUC y al menos un producto son requeridos.", severity="error")
+                return
+            
+            if len(ruc) != 11:
+                self.app.notify("El RUC debe tener 11 dígitos.", severity="error")
+                return
+            
+            po_data = {
+                'fecha_estimada': self.query_one("#in_po_delivery_date").value,
+                'condicion_pago': self.query_one("#in_po_payment").value,
+                'lugar_entrega': self.query_one("#in_po_place").value,
+            }
+            
+            items_for_db = [(code, data[1], data[2]) for code, data in self.po_items.items()]
+            try:
+                database.create_purchase_order(proveedor, ruc, items_for_db, po_data)
+                self.dismiss(True)
+            except Exception as e:
+                self.app.notify(f"Error: {e}", severity="error")
+        elif event.button.id == "btn_cancel_po": self.dismiss(False)
+    
+    def refresh_po_items_table(self):
+        table = self.query_one("#po_items_table"); table.clear()
+        for code, (nombre, qty, cost) in self.po_items.items(): table.add_row(code, str(qty), f"${cost:.2f}", nombre)
+
+class ERPApp(App):
+    TITLE = "Ferretería ROLIK - Sistema de Gestión"
+    CSS = """
+    Screen { background: #1a1b26; color: #c0caf5; }
+    #menu_container { align: center middle; height: 100%; }
+    #title { text-align: center; width: 100%; padding: 1; margin-bottom: 2; background: #7aa2f7; color: #1a1b26; text-style: bold; }
+    #section_title { text-align: center; width: 100%; padding: 1; background: #bb9af7; color: #1a1b26; text-style: bold; }
+    Button { width: 30; margin: 1; }
+    #inventory_actions, #po_actions, #user_actions, #report_actions { height: auto; padding: 1; align: center middle; }
+    #search_sort_bar {
+        align: center middle;
+        padding: 0 1;
+        height: 5;
+    }
+    #search_box {
+        width: 40%;
+    }
+    #search_sort_bar Button {
+        width: auto;
+        min-width: 15;
+    }
+    DataTable { height: 70%; margin: 1; border: double #7aa2f7; }
+    .low-stock { background: #b48608 40%; }
+    .no-stock { background: #c10000 50%; text-style: bold; }
+    
+    #form-body {
+        padding: 0 2;
+    }
+    #modal_title { 
+        text-align: center; 
+        width: 100%; 
+        padding-top: 1;
+        text-style: bold; 
+    }
+    .form-buttons { 
+        align: center middle; 
+        height: 5;
+        dock: bottom;
+    }
+    Input { margin-bottom: 1; } 
+    Label { margin-top: 1; }
+    #pos_left { width: 65%; padding: 0 1; } #pos_right { width: 35%; padding: 0 1; border-left: double #7aa2f7; }
+    #pos_total_label { border: wide #f7768e; text-align: center; text-style: bold; padding: 1; margin: 2 0; }
+    #ticket_text { width: auto; } .modal-container { align: center middle; padding: 2; background: #24283b; border: heavy #7aa2f7; width: auto; height: auto; }
+    #po_form_left { width: 30%; } #po_form_right { width: 70%; }
+    #user_actions { height: auto; padding: 1; align: center middle; }
+    
+    #login-container {
+        width: 50;
+        height: auto;
+        border: heavy #7aa2f7;
+    }
+    .po-details-text {
+        padding: 1;
+        margin: 1;
+        background: #24283b;
+        border: solid #7aa2f7;
+        color: #7aa2f7;
+        text-style: bold;
+    }
+    #po_header_form {
+        height: auto;
+        margin-bottom: 1;
+    }
+    #po_header_form Vertical {
+        padding: 0 1;
+    }
+    .po-row { height: auto; margin-bottom: 1; }
+    .po-col { width: 50%; padding: 0 1; }
+    .sub-title { text-align: center; margin: 1 0; text-style: bold; color: #7aa2f7; border-top: solid #7aa2f7; padding-top: 1; }
+    #po-product-adder { height: 3; margin-bottom: 1; align: center middle; }
+    #po-product-adder .input-search { width: 45%; margin: 0 1; }
+    #po-product-adder .input-small { width: 15%; margin: 0 1; }
+    #po-product-adder Button { width: 15; margin: 0 1; }
+    #po_items_table { height: 12; border: double #bb9af7; margin: 1 0; }
+    .form-buttons-po { align: center middle; height: 3; margin-top: 1; }
+    .form-buttons-po Button { width: 20; margin: 0 2; }
+    #report_menu_container {
+        padding: 1 2;
+        align: center middle;
+    }
+    .report-row {
+        height: auto;
+        margin-bottom: 1;
+        align: center middle;
+    }
+    .report-row Button {
+        width: 35;
+        margin: 0 2;
+    }
+    .report-summary-box {
+        background: #24283b;
+        color: #7aa2f7;
+        border: double #7aa2f7;
+        padding: 2;
+        margin: 2;
+        width: 60;
+        height: auto;
+        text-style: bold;
+    }
+    #filter_bar {
+        height: 5;
+        align: center middle;
+        padding: 1;
+    }
+    #filter_bar Input {
+        width: 25;
+        margin: 0 1;
+    }
+    #receipt-view-dialog {
+        width: 60;
+        height: 45;
+        border: thick #7aa2f7;
+        background: #1a1b26;
+    }
+    .receipt-text-area {
+        background: #24283b;
+        color: #c0caf5;
+        padding: 1 2;
+        border: solid #3b4261;
+        margin: 1;
+        height: 30;
+        text-style: bold;
+    }
+    .help-text {
+        text-align: center;
+        color: #bb9af7;
+        text-style: italic;
+        margin-bottom: 1;
+    }
+    #client-search-row {
+        height: 3;
+        margin-bottom: 1;
+    }
+    #client-search-row Input {
+        width: 70%;
+    }
+    #client-search-row Button {
+        width: 25%;
+        margin-left: 1;
+    }
+    #customer_search_bar {
+        height: 5;
+        align: center middle;
+        padding: 1;
+    }
+    #customer_search_bar Input {
+        width: 60%;
+        margin-right: 2;
+    }
+    #customer_search_bar Button {
+        width: 20;
+    }
+    #customer_actions {
+        height: auto;
+        padding: 1;
+        align: center middle;
+    }
+    #customer_actions Button {
+        width: 25;
+        margin: 0 1;
+    }
+    #cust-form-container {
+        width: 60;
+        height: 40;
+        border: thick #7aa2f7;
+        background: #1a1b26;
+        padding: 1 2;
+    }
+    #search-dialog {
+        width: 80;
+        height: 30;
+        border: thick #bb9af7;
+        background: #1a1b26;
+    }
+    #pay-dialog-container {
+        width: 70;
+        height: 55;
+        border: thick #7aa2f7;
+        background: #1a1b26;
+        padding: 1 2;
+    }
+    .options-row {
+        margin: 1 0;
+        height: 3;
+        align: center middle;
+    }
+    .options-row Button {
+        width: 15;
+        margin: 0 1;
+    }
+    #search_results_table {
+        height: 20;
+        border: solid #7aa2f7;
+    }
+    .opt-btn { width: 15; margin: 0 1; background: #3b4261; }
+    .opt-btn:focus { background: #7aa2f7; color: #1a1b26; }
+    #lbl_change { margin-top: 1; padding: 1; border: solid #7aa2f7; text-align: center; color: #7aa2f7; text-style: bold; }
+    #pos_in_search { width: 100%; margin-bottom: 1; }
+    #in_paid_amount { margin-top: 1; }
+    """
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user_id = None
+        self.user_role = None
+        self.user_name = None
+        self.is_discount_enabled = False
+        self.max_discount_percentage = 0
+        self.commission_rate = 0.0
+        self.permissions = set()
+
+    def on_mount(self) -> None: 
+        database.init_db()
+        self.show_login()
+
+    def show_login(self):
+        self.push_screen(LoginScreen(), callback=self.on_login_finished)
+
+    def has_permission(self, permission_name: str) -> bool:
+        """Comprueba si el usuario logueado tiene un permiso específico."""
+        return permission_name in self.permissions
+
+    def on_login_finished(self, user_data: dict | None):
+        if user_data:
+            self.user_id = user_data['id']
+            self.user_role = user_data['role']
+            self.user_name = user_data['username']
+            self.is_discount_enabled = user_data.get('is_discount_enabled', 0)
+            self.max_discount_percentage = user_data.get('max_discount_percentage', 0)
+            self.commission_rate = user_data.get('commission_rate', 0.0)
+            self.permissions = user_data.get('permissions', set()) # Cargar permisos
+            self.notify(f"Bienvenido {self.user_name} ({self.user_role})", severity="success")
+            self.push_screen(MainMenu())
+        else:
+            self.exit()
+
+if __name__ == "__main__":
+    app = ERPApp()
+    app.run()
