@@ -659,7 +659,8 @@ class InventoryScreen(Screen):
     BINDINGS = [Binding(key, action, desc) for key, action, desc in [
         ("escape", "app.pop_screen", "Volver"), ("n", "add_product", "Nuevo"),
         ("e", "edit_product", "Editar"), ("d", "delete_product", "Eliminar"),
-        ("i", "import_excel", "Importar"), ("r", "refresh_table", "Refrescar")]]
+        ("i", "import_excel", "Importar"), ("x", "export_inventory", "Exportar"),
+        ("r", "refresh_table", "Refrescar")]]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -687,6 +688,7 @@ class InventoryScreen(Screen):
                 yield Button("Eliminar (D)", "error", id="btn_delete")
             if self.app.has_permission('product.import'):
                 yield Button("Importar (I)", "primary", id="btn_import") 
+            yield Button("Exportar (X)", "success", id="btn_export")
             yield Button("Refrescar (R)", "primary", id="btn_refresh")
             yield Button("Volver (ESC)", "error", id="btn_back")
         
@@ -770,12 +772,44 @@ class InventoryScreen(Screen):
     def action_import_excel(self):
         self.app.push_screen(ImportDialog(), lambda success: self.refresh_inventory() if success else None)
     
+    def action_export_inventory(self):
+        """Exporta todo el inventario a un archivo Excel."""
+        try:
+            products = database.get_all_products_for_display()
+            if not products:
+                self.app.notify("No hay productos para exportar.", severity="warning")
+                return
+
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Inventario ROLIK"
+
+            # Encabezados
+            headers = ["CÓDIGO", "NOMBRE", "CATEGORÍA", "FABRICANTE", "DESCRIPCIÓN", "P. VENTA", "P. COMPRA", "UNIDAD", "STOCK", "FECHA INGRESO", "PROVEEDOR"]
+            ws.append(headers)
+
+            for p in products:
+                ws.append([
+                    p['codigo'], p['nombre'], p['categoria'], p['fabricante'], p['descripcion'],
+                    p['precio_venta'], p['precio_compra'], p['unidad'], p['stock'], 
+                    p['fecha_ingreso'], p['proveedor']
+                ])
+
+            filename = f"Inventario_ROLIK_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+            wb.save(filename)
+            self.app.notify(f"Inventario exportado: {filename}", severity="information")
+            if os.name == 'nt': os.startfile(filename)
+            
+        except Exception as e:
+            self.app.notify(f"Error al exportar: {e}", severity="error")
+
     def on_button_pressed(self, event: Button.Pressed):
         action_map = {
             "btn_new": self.action_add_product, 
             "btn_edit": self.action_edit_product,
             "btn_delete": self.action_delete_product,
             "btn_import": self.action_import_excel, 
+            "btn_export": self.action_export_inventory,
             "btn_refresh": self.action_refresh_table,
             "btn_back": self.app.pop_screen
         }
@@ -1064,15 +1098,17 @@ class ProductSearchDialog(Screen):
 
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "btn_select_prod":
-            table = self.query_one("#search_results_table")
+            table = self.query_one("#search_results_table", DataTable)
             try:
                 if table.cursor_row is not None:
-                    row_key = table.proxy.get_row_key_at(table.cursor_row)
-                    self.dismiss(str(row_key.value))
+                    # Obtenemos el valor de la celda en la columna 0 (Código)
+                    codigo = table.get_cell_at((table.cursor_row, 0))
+                    if codigo:
+                        self.dismiss(str(codigo))
                 else:
-                    self.app.notify("Selecciona un producto de la lista.")
-            except Exception:
-                self.app.notify("Error al seleccionar.")
+                    self.app.notify("Selecciona un producto de la lista.", severity="warning")
+            except Exception as e:
+                self.app.notify("Error: Seleccione una fila válida primero.", severity="error")
         elif event.button.id == "btn_cancel_search":
             self.dismiss(None)
 
@@ -1278,8 +1314,128 @@ class FinalReceiptScreen(Screen):
         with Vertical(classes="modal-container", id="final-receipt-container"):
             yield Static(receipt, id="ticket_text_view")
             with Horizontal(classes="form-buttons"):
-                yield Button("Imprimir Ticket (80mm)", variant="success", id="btn_print_thermal")
+                yield Button("Ticket Texto (Rápido)", variant="success", id="btn_print_thermal")
+                yield Button("Imprimir HTML (80mm)", variant="success", id="btn_print_html")
                 yield Button("Cerrar y Nueva Venta", variant="primary", id="btn_done")
+
+    def generar_html_ticket(self):
+        """Genera un archivo HTML con estilo profesional para ticketeras de 80mm."""
+        now = datetime.now().strftime('%d/%m/%Y %H:%M')
+        items_html = ""
+        for _, datos in self.cart.items():
+            # [nombre, qty, price, stock, marca, unidad]
+            nombre = str(datos[0])[:25]
+            qty = datos[1]
+            price = datos[2]
+            sub = qty * price
+            items_html += f"""
+            <tr>
+                <td>{qty}</td>
+                <td>{nombre}</td>
+                <td style='text-align: right;'>{sub:.2f}</td>
+            </tr>"""
+
+        subtotal = self.total / 1.18
+        igv = self.total - subtotal
+
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                @page {{ margin: 0; }}
+                body {{ 
+                    width: 72mm; 
+                    font-family: 'Arial Narrow', Arial, sans-serif; 
+                    font-size: 12px; 
+                    margin: 0; 
+                    padding: 4mm;
+                    color: black;
+                }}
+                .center {{ text-align: center; }}
+                .bold {{ font-weight: bold; }}
+                .line {{ border-top: 1px dashed black; margin: 5px 0; }}
+                table {{ width: 100%; border-collapse: collapse; margin: 10px 0; }}
+                th {{ border-bottom: 1px solid black; text-align: left; }}
+                .total-table {{ margin-top: 10px; float: right; width: 60%; }}
+                .footer {{ margin-top: 20px; font-size: 10px; }}
+            </style>
+        </head>
+        <body onload="window.print();">
+            <div class="center">
+                <div class="bold" style="font-size: 16px;">FERRETERÍA ROLIK</div>
+                <div>RUC: 10440809320</div>
+                <div>Mz A lt 26 P.I. Madera KM 15.5</div>
+                <div>Cel: 988352912 / 932326764</div>
+                <div class="line"></div>
+                <div class="bold">{self.pay_data['tipo_comprobante']}</div>
+                <div>{self.correlativo}</div>
+                <div>Fecha: {now}</div>
+            </div>
+            
+            <div style="margin-top: 10px;">
+                <div><b>Cliente:</b> {self.pay_data.get('cliente_nombre', 'PÚBLICO GENERAL')}</div>
+                <div><b>Doc:</b> {self.pay_data.get('cliente_documento', '00000000')}</div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Cant</th>
+                        <th style="width: 60%;">Descrip</th>
+                        <th style="width: 25%; text-align: right;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {items_html}
+                </tbody>
+            </table>
+
+            <div class="line"></div>
+            <table class="total-table">
+                <tr><td>SUBTOTAL:</td><td style="text-align: right;">S/ {subtotal:.2f}</td></tr>
+                <tr><td>IGV (18%):</td><td style="text-align: right;">S/ {igv:.2f}</td></tr>
+                <tr class="bold" style="font-size: 14px;"><td>TOTAL:</td><td style="text-align: right;">S/ {self.total:.2f}</td></tr>
+            </table>
+            
+            <div style="clear: both; margin-top: 10px;">
+                <div><b>Pago:</b> {self.pay_data['metodo_pago']}</div>
+                <div><b>Recibido:</b> S/ {self.pay_data['monto_pagado']:.2f}</div>
+                <div><b>Vuelto:</b> S/ {self.pay_data['vuelto']:.2f}</div>
+            </div>
+
+            <div class="center footer">
+                <div class="line"></div>
+                <p>¡GRACIAS POR SU COMPRA EN ROLIK!</p>
+                <p>Representación impresa de la {self.pay_data['tipo_comprobante'].lower()}</p>
+            </div>
+        </body>
+        </html>
+        """
+        return html
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_print_thermal":
+            self.imprimir_ticket_archivo()
+        elif event.button.id == "btn_print_html":
+            self.imprimir_ticket_html()
+        else:
+            self.app.pop_screen()
+
+    def imprimir_ticket_html(self):
+        """Genera y abre el ticket en formato HTML."""
+        try:
+            filename = f"Ticket_{self.correlativo}.html"
+            content = self.generar_html_ticket()
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(content)
+            
+            self.app.notify(f"HTML generado: {filename}", severity="information")
+            if os.name == 'nt':
+                os.startfile(filename) # Forma nativa y segura en Windows
+        except Exception as e:
+            self.app.notify(f"Error HTML: {e}", severity="error")
 
     def generar_texto_ticket(self):
         """Genera el contenido del ticket compacto para ticketera de 80mm."""
@@ -1969,14 +2125,17 @@ class ViewReceiptDialog(Screen):
             yield Label("VISUALIZACIÓN DE COMPROBANTE", id="modal_title")
             yield Static(id="receipt_content", classes="receipt-text-area")
             with Horizontal(classes="form-buttons"):
-                yield Button("Imprimir Recibo", variant="success", id="btn_print_receipt")
+                yield Button("Ticket Texto", variant="success", id="btn_print_receipt")
+                yield Button("Ticket HTML", variant="success", id="btn_print_html_view")
                 yield Button("Cerrar", variant="error", id="btn_close_view")
 
     def on_mount(self):
-        sale, items = database.get_sale_full_details(self.trans_id)
-        if sale:
-            self.correlativo = sale.get('correlativo', f"ID_{self.trans_id}")
-            self.receipt_content = self.formatear_recibo(sale, items)
+        sale_row, items_row = database.get_sale_full_details(self.trans_id)
+        if sale_row:
+            self.sale_dict = dict(sale_row)
+            self.items_list = [dict(i) for i in items_row]
+            self.correlativo = self.sale_dict.get('correlativo', f"ID_{self.trans_id}")
+            self.receipt_content = self.formatear_recibo(self.sale_dict, self.items_list)
             self.query_one("#receipt_content").update(self.receipt_content)
 
     def formatear_recibo(self, sale, items):
@@ -1992,7 +2151,7 @@ class ViewReceiptDialog(Screen):
         t += f"{'CANT':<5} {'DESCRIPCION':<24} {'TOTAL':>10}\n{'-'*width}\n"
         for item in items:
             sub = item['quantity'] * item['unit_price']
-            desc = f"{item['nombre'][:20]} ({str(item['fabricante'] or '')[:3]})"
+            desc = f"{item['nombre'][:20]} ({str(item.get('fabricante') or '')[:3]})"
             t += f"{item['quantity']:<5} {desc:<24} {sub:>10.2f}\n"
         t += f"{'-'*width}\n{'TOTAL PAGADO:':<28} S/ {sale['total']:>10.2f}\n"
         t += f"METODO PAGO: {sale['metodo_pago']}\n{'='*width}\n"
@@ -2001,8 +2160,34 @@ class ViewReceiptDialog(Screen):
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "btn_print_receipt":
             self.imprimir_recibo_archivo()
+        elif event.button.id == "btn_print_html_view":
+            self.imprimir_ticket_html_reprint()
         else:
             self.dismiss()
+
+    def imprimir_ticket_html_reprint(self):
+        """Genera y abre el HTML para un ticket antiguo."""
+        try:
+            filename = f"Ticket_{self.correlativo}.html"
+            items_html = ""
+            for item in self.items_list:
+                items_html += f"<tr><td>{item['quantity']}</td><td>{item['nombre'][:25]}</td><td style='text-align: right;'>{(item['quantity']*item['unit_price']):.2f}</td></tr>"
+
+            subtotal = self.sale_dict['total'] / 1.18
+            igv = self.sale_dict['total'] - subtotal
+            
+            html = f"""
+            <!DOCTYPE html><html><head><meta charset="UTF-8"><style>@page {{ margin: 0; }} body {{ width: 72mm; font-family: 'Arial Narrow', Arial, sans-serif; font-size: 12px; margin: 0; padding: 4mm; color: black; }} .center {{ text-align: center; }} .bold {{ font-weight: bold; }} .line {{ border-top: 1px dashed black; margin: 5px 0; }} table {{ width: 100%; border-collapse: collapse; margin: 10px 0; }} th {{ border-bottom: 1px solid black; text-align: left; }} .total-table {{ margin-top: 10px; float: right; width: 60%; }} .footer {{ margin-top: 20px; font-size: 10px; }}</style></head><body onload="window.print();">
+            <div class="center"><div class="bold" style="font-size: 16px;">FERRETERÍA ROLIK</div><div>RUC: 10440809320</div><div>Mz A lt 26 P.I. Madera KM 15.5</div><div>Cel: 988352912 / 932326764</div><div class="line"></div><div class="bold">{self.sale_dict['tipo_comprobante']}</div><div>{self.correlativo}</div><div>Fecha: {self.sale_dict['date']}</div></div>
+            <div style="margin-top: 10px;"><div><b>Cliente:</b> {self.sale_dict.get('cliente_nombre', 'PÚBLICO GENERAL')}</div><div><b>Doc:</b> {self.sale_dict.get('cliente_documento', '00000000')}</div></div>
+            <table><thead><tr><th style="width: 15%;">Cant</th><th style="width: 60%;">Descrip</th><th style="width: 25%; text-align: right;">Total</th></tr></thead><tbody>{items_html}</tbody></table>
+            <div class="line"></div><table class="total-table"><tr><td>SUBTOTAL:</td><td style="text-align: right;">S/ {subtotal:.2f}</td></tr><tr><td>IGV (18%):</td><td style="text-align: right;">S/ {igv:.2f}</td></tr><tr class="bold" style="font-size: 14px;"><td>TOTAL:</td><td style="text-align: right;">S/ {self.sale_dict['total']:.2f}</td></tr></table>
+            <div style="clear: both; margin-top: 10px;"><div><b>Pago:</b> {self.sale_dict['metodo_pago']}</div><div><b>Recibido:</b> S/ {self.sale_dict.get('monto_pagado', 0):.2f}</div><div><b>Vuelto:</b> S/ {self.sale_dict.get('vuelto', 0):.2f}</div></div>
+            <div class="center footer"><div class="line"></div><p>¡GRACIAS POR SU COMPRA EN ROLIK!</p></div></body></html>
+            """
+            with open(filename, "w", encoding="utf-8") as f: f.write(html)
+            if os.name == 'nt': os.startfile(filename)
+        except Exception as e: self.app.notify(f"Error HTML: {e}", severity="error")
 
     def imprimir_recibo_archivo(self):
         """Guarda el recibo actual en un archivo .txt."""
