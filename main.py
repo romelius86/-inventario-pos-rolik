@@ -1,15 +1,16 @@
 import os
 import openpyxl
 import csv
-import requests  # Para consultas a APIs de DNI/RUC
+import requests
+import webbrowser # Para abrir WhatsApp y Correo
 from datetime import datetime
 from fpdf import FPDF
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical, Horizontal, VerticalScroll
+from textual.containers import Vertical, Horizontal, VerticalScroll, Grid
 from textual.screen import Screen
-from textual.widgets import Header, Footer, Static, Button, DataTable, Label, Input, Checkbox
+from textual.widgets import Header, Footer, Static, Button, DataTable, Label, Input, Checkbox, Select
 
 import database
 
@@ -206,34 +207,34 @@ class MainMenu(Screen):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         user_name = getattr(self.app, "user_name", "Usuario")
-        
+
         with Vertical(id="menu_container"):
             yield Label(f"SISTEMA ROLIK ERP - {user_name.upper()}", id="title")
-            
-            if self.app.has_permission('product.view'):
-                yield Button("1. INVENTARIO", id="btn_inventory", variant="primary")
-            
-            if self.app.has_permission('purchase_order.view'):
-                yield Button("2. ÓRDENES DE COMPRA", id="btn_purchases", variant="primary")
-            
-            # NUEVO BOTÓN DE CLIENTES
-            yield Button("3. GESTIÓN DE CLIENTES", id="btn_customers", variant="primary")
-                
-            if self.app.has_permission('user.view'):
-                yield Button("USUARIOS", id="btn_users", variant="primary")
 
-            if self.app.has_permission('report.view.sales') or self.app.has_permission('report.view.cash') or self.app.has_permission('report.view.commissions'):
-                yield Button("REPORTES", id="btn_reports", variant="warning")
-            
-            if self.app.has_permission('pos.use'):
-                yield Button("4. PUNTO DE VENTA (POS)", id="btn_pos", variant="success")
-            
-            if self.app.has_permission('cash.manage'):
-                yield Button("5. GESTIÓN DE CAJA", id="btn_cash", variant="warning")
-                
-            yield Button("SALIR", id="btn_exit", variant="error")
+            with Grid(id="buttons_grid"):
+                if self.app.has_permission('product.view'):
+                    yield Button("1. INVENTARIO", id="btn_inventory", variant="primary")
+
+                if self.app.has_permission('purchase_order.view'):
+                    yield Button("2. ÓRDENES DE COMPRA", id="btn_purchases", variant="primary")
+
+                # NUEVO BOTÓN DE CLIENTES
+                yield Button("3. GESTIÓN DE CLIENTES", id="btn_customers", variant="primary")
+
+                if self.app.has_permission('user.view'):
+                    yield Button("USUARIOS", id="btn_users", variant="primary")
+
+                if self.app.has_permission('report.view.sales') or self.app.has_permission('report.view.cash') or self.app.has_permission('report.view.commissions'):
+                    yield Button("REPORTES", id="btn_reports", variant="warning")
+
+                if self.app.has_permission('pos.use'):
+                    yield Button("4. PUNTO DE VENTA (POS)", id="btn_pos", variant="success")
+
+                if self.app.has_permission('cash.manage'):
+                    yield Button("5. GESTIÓN DE CAJA", id="btn_cash", variant="warning")
+
+                yield Button("SALIR", id="btn_exit", variant="error")
         yield Footer()
-
     def on_button_pressed(self, event: Button.Pressed) -> None:
         screen_map = {
             "btn_inventory": InventoryScreen,
@@ -672,6 +673,8 @@ class InventoryScreen(Screen):
         yield Label("ROLIK - INVENTARIO DE PRODUCTOS", id="section_title")
         with Horizontal(id="search_sort_bar"):
             yield Input(placeholder="Buscar por código, nombre...", id="search_box")
+            yield Button("Código ↓", id="sort_code_desc", variant="primary")
+            yield Button("Código ↑", id="sort_code_asc", variant="primary")
             yield Button("Nombre ↓", id="sort_name_desc", variant="primary")
             yield Button("Nombre ↑", id="sort_name_asc", variant="primary")
             yield Button("Stock ↓", id="sort_stock_desc", variant="primary")
@@ -696,7 +699,11 @@ class InventoryScreen(Screen):
     
     def on_mount(self) -> None:
         table = self.query_one(DataTable); table.cursor_type = "row"
-        table.add_columns("Código", "Nombre", "Categoría", "Fabricante", "Descripción", "P.Venta", "P.Compra", "Unidad", "Stock", "Fecha Ingreso", "Importe Inv.", "Proveedor")
+        table.add_columns(
+            "ID", "SKU", "Producto", "Categoría", "Proveedor", "Descripción",
+            "Stock Act.", "Stock Mín.", "Stock Máx.", 
+            "Costo Prom.", "Precio Venta", "Valor Inv."
+        )
         self.refresh_inventory()
 
     def on_input_changed(self, event: Input.Changed) -> None:
@@ -739,23 +746,25 @@ class InventoryScreen(Screen):
             )
             
             for p in products:
-                codigo = str(p['codigo'] or "")
-                nombre = str(p['nombre'] or "")
-                cat = str(p['categoria'] or "")
-                fab = str(p['fabricante'] or "")
-                desc = str(p['descripcion'] or "")
-                p_venta = f"${(p['precio_venta'] or 0.0):.2f}"
-                p_compra = f"${(p['precio_compra'] or 0.0):.2f}"
-                unidad = str(p['unidad'] or "")
-                stock = str(p['stock'] or "0")
-                fecha = str(p['fecha_ingreso'] or "")[:10]
-                importe = f"${(p['importe_inventario'] or 0.0):.2f}"
-                prov = str(p['proveedor'] or "")
-
+                # Formateamos los valores numéricos para que se vean profesionales
+                costo_prom = f"S/ {p['costo_promedio']:,.2f}"
+                precio_venta = f"S/ {p['precio_venta']:,.2f}"
+                valor_inv = f"S/ {p['valor_inventario']:,.2f}"
+                
                 table.add_row(
-                    codigo, nombre, cat, fab, desc, p_venta, p_compra, 
-                    unidad, stock, fecha, importe, prov,
-                    key=codigo
+                    str(p['id']),
+                    str(p['sku']),
+                    str(p['nombre']),
+                    str(p['categoria'] or "N/A"),
+                    str(p['proveedor_nombre'] or "-"),
+                    str(p['descripcion'] or "-"),
+                    str(p['stock_actual']),
+                    str(p['stock_minimo']),
+                    str(p['stock_maximo']),
+                    costo_prom,
+                    precio_venta,
+                    valor_inv,
+                    key=str(p['sku'])
                 )
             
             table.refresh()
@@ -780,6 +789,7 @@ class InventoryScreen(Screen):
                 self.app.notify("No hay productos para exportar.", severity="warning")
                 return
 
+            os.makedirs("reportes", exist_ok=True)
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.title = "Inventario ROLIK"
@@ -792,10 +802,10 @@ class InventoryScreen(Screen):
                 ws.append([
                     p['codigo'], p['nombre'], p['categoria'], p['fabricante'], p['descripcion'],
                     p['precio_venta'], p['precio_compra'], p['unidad'], p['stock'], 
-                    p['fecha_ingreso'], p['proveedor']
+                    p['fecha_ingreso'], p['proveedor_nombre']
                 ])
 
-            filename = f"Inventario_ROLIK_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+            filename = os.path.join("reportes", f"Inventario_ROLIK_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx")
             wb.save(filename)
             self.app.notify(f"Inventario exportado: {filename}", severity="information")
             if os.name == 'nt': os.startfile(filename)
@@ -815,6 +825,8 @@ class InventoryScreen(Screen):
         }
         
         sort_map = {
+            "sort_code_asc": "codigo_asc",
+            "sort_code_desc": "codigo_desc",
             "sort_name_asc": "nombre_asc",
             "sort_name_desc": "nombre_desc",
             "sort_stock_asc": "stock_asc",
@@ -1037,8 +1049,8 @@ class POSScreen(Screen):
         if not self.cart:
             self.app.notify("Carrito vacío.", severity="warning")
             return
-        # Lanzar el diálogo de pago
-        self.app.push_screen(PaymentDialog(self.total), self.on_payment_finished)
+        # AHORA PASAMOS EL CARRITO Y EL TOTAL AL DIÁLOGO
+        self.app.push_screen(PaymentDialog(self.cart, self.total), self.on_payment_finished)
 
     def on_payment_finished(self, payment_result):
         if payment_result:
@@ -1144,108 +1156,195 @@ class QuantityDialog(Screen):
             self.dismiss(None)
 
 class PaymentDialog(Screen):
-    def __init__(self, total):
+    def __init__(self, cart, total):
         super().__init__()
+        self.cart = cart
         self.total = total
         self.payment_method = "EFECTIVO"
         self.comp_type = "BOLETA"
 
     def compose(self) -> ComposeResult:
-        with Vertical(classes="modal-container", id="pay-dialog-container"):
-            yield Label(f"FINALIZAR VENTA - TOTAL: S/ {self.total:.2f}", id="modal_title")
+        with Vertical(classes="modal-container", id="pay-dialog-full"):
+            yield Label("CONFIRMAR VENTA Y PAGO", id="modal_title")
             
-            yield Label("Tipo de Comprobante:")
-            with Horizontal(classes="options-row"):
-                yield Button("BOLETA", id="btn_boleta", variant="primary")
-                yield Button("FACTURA", id="btn_factura")
-                yield Button("TICKET", id="btn_ticket")
+            # PARTE SUPERIOR: CLIENTE Y PAGO (2 Columnas)
+            with Grid(id="pay_top_grid"):
+                # Columna Cliente
+                with Vertical(classes="pay_box"):
+                    yield Label("1. DATOS DEL CLIENTE:")
+                    with Horizontal(classes="options-row"):
+                        yield Button("BOLETA", id="btn_boleta", variant="primary")
+                        yield Button("FACTURA", id="btn_factura")
+                        yield Button("TICKET", id="btn_ticket")
+                    with Horizontal(id="client-search-row"):
+                        yield Input(placeholder="DNI/RUC", id="in_client_doc", restrict=r"[0-9]*")
+                        yield Button("🔍", id="btn_search_client", variant="primary")
+                    yield Input(placeholder="Nombre / Razón Social", id="in_client_name")
+                
+                # Columna Pago
+                with Vertical(classes="pay_box"):
+                    yield Label("2. MÉTODO DE PAGO Y COBRO:")
+                    with Horizontal(classes="options-row"):
+                        yield Button("EFECTIVO", id="btn_efectivo", variant="primary")
+                        yield Button("TARJETA", id="btn_tarjeta")
+                        yield Button("YAPE/PLIN", id="btn_yape")
+                    yield Label("MONTO RECIBIDO:")
+                    yield Input(str(self.total), id="in_paid_amount", restrict=r"[0-9.]*")
+                    yield Static("VUELTO: S/ 0.00", id="lbl_change")
 
-            yield Label("Datos del Cliente:")
-            with Horizontal(id="client-search-row"):
-                yield Input(placeholder="DNI/RUC", id="in_client_doc", restrict=r"[0-9]*")
-                yield Button("🔍 Buscar", id="btn_search_client", variant="primary")
-            
-            yield Input(placeholder="Nombre o Razón Social", id="in_client_name")
-            yield Input(placeholder="Dirección (Opcional)", id="in_client_dir")
-            
-            with Horizontal(classes="options-row"):
-                yield Input(placeholder="Teléfono", id="in_client_tel", restrict=r"[0-9]*")
-                yield Input(placeholder="Correo electrónico", id="in_client_email")
-
-            yield Label("Método de Pago:")
-            with Horizontal(classes="options-row"):
-                yield Button("EFECTIVO", id="btn_efectivo", variant="primary")
-                yield Button("TARJETA", id="btn_tarjeta")
-                yield Button("YAPE/PLIN", id="btn_yape")
-                yield Button("MIXTO", id="btn_mixto")
-
-            yield Label("Monto Recibido:")
-            yield Input(str(self.total), id="in_paid_amount", restrict=r"[0-9.]*")
-            yield Static("Vuelto: S/ 0.00", id="lbl_change")
+            # PARTE INFERIOR: REVISIÓN Y EDICIÓN DE PRODUCTOS
+            with Vertical(id="pay_bottom_container"):
+                yield Label("3. REVISAR Y EDITAR PRODUCTOS:")
+                # Buscador extra por si falta algo
+                with Horizontal(id="pay_extra_search_row"):
+                    yield Input(placeholder="¿Falta algo? Busca por Código o Nombre aquí...", id="in_pay_extra_search")
+                
+                yield DataTable(id="pay_confirm_table")
+                
+                with Horizontal(id="pay_edit_controls"):
+                    yield Button("➕ Aumentar", id="btn_add_qty", variant="success")
+                    yield Button("➖ Disminuir", id="btn_sub_qty", variant="warning")
+                    yield Button("❌ Eliminar Item", id="btn_remove_item", variant="error")
+                
+                yield Static(f"TOTAL A PAGAR: S/ {self.total:.2f}", id="pay_confirm_subtotal")
             
             with Horizontal(classes="form-buttons"):
-                yield Button("Confirmar Pago", variant="success", id="btn_confirm_pay")
-                yield Button("Cancelar", variant="error", id="btn_cancel_pay")
+                yield Button("¡CONFIRMAR VENTA FINAL!", variant="success", id="btn_confirm_pay")
+                yield Button("CANCELAR / VOLVER", variant="error", id="btn_cancel_pay")
+
+    def on_input_submitted(self, event: Input.Submitted):
+        if event.input.id == "in_pay_extra_search":
+            term = event.value.strip()
+            if term:
+                self.buscar_y_añadir_extra(term)
+                event.input.value = ""
+
+    def buscar_y_añadir_extra(self, term):
+        """Busca un producto y lo añade al carrito desde la ventana de pago."""
+        # 1. Intentar código exacto primero
+        product = database.get_product(term)
+        if product:
+            self.finalizar_añadido_extra(product)
+            return
+
+        # 2. Si no, buscar coincidencias similares
+        results = database.get_all_products_for_display(search_term=term)
+        if len(results) == 0:
+            self.app.notify(f"No se encontró nada con '{term}'.", severity="error")
+        elif len(results) == 1:
+            # Si solo hay uno, lo agregamos directo
+            full_prod = database.get_product(results[0]['codigo'])
+            self.finalizar_añadido_extra(full_prod)
+        else:
+            # SI HAY VARIOS, MOSTRAR DIÁLOGO DE SELECCIÓN
+            self.app.push_screen(ProductSearchDialog(term, results), self.on_extra_product_selected)
+
+    def on_extra_product_selected(self, product_code):
+        """Callback cuando se selecciona un producto del diálogo de búsqueda extra."""
+        if product_code:
+            product = database.get_product(product_code)
+            if product:
+                self.finalizar_añadido_extra(product)
+
+    def finalizar_añadido_extra(self, product):
+        """Añade físicamente el producto al carrito del diálogo."""
+        code = product['codigo']
+        if code in self.cart:
+            if self.cart[code][1] < product['stock']:
+                self.cart[code][1] += 1
+            else:
+                self.app.notify("Stock insuficiente.", severity="error")
+        else:
+            # [nombre, qty, price, stock, marca, unidad]
+            self.cart[code] = [product['nombre'], 1, product['precio_venta'], product['stock'], product['fabricante'], product['unidad']]
+        
+        self.refresh_confirm_table()
+        self.app.notify(f"Añadido: {product['nombre']}")
+
+    def on_mount(self):
+        table = self.query_one("#pay_confirm_table")
+        table.add_columns("Prod", "Cant", "Total")
+        table.cursor_type = "row"
+        self.refresh_confirm_table()
+
+    def refresh_confirm_table(self):
+        table = self.query_one("#pay_confirm_table")
+        table.clear()
+        new_total = 0.0
+        for code, data in self.cart.items():
+            sub = data[1] * data[2]
+            new_total += sub
+            table.add_row(data[0][:20], str(data[1]), f"{sub:.2f}")
+        
+        self.total = new_total
+        self.query_one("#pay_confirm_subtotal").update(f"TOTAL A PAGAR: S/ {self.total:.2f}")
+        self.query_one("#lbl_change").update(f"VUELTO: S/ {max(0, float(self.query_one('#in_paid_amount').value or 0) - self.total):.2f}")
 
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "btn_search_client":
             self.consultar_cliente()
+        elif event.button.id == "btn_add_qty":
+            self.modify_qty(1)
+        elif event.button.id == "btn_sub_qty":
+            self.modify_qty(-1)
+        elif event.button.id == "btn_remove_item":
+            self.remove_item()
         elif event.button.id in ["btn_boleta", "btn_factura", "btn_ticket"]:
-            for bid in ["btn_boleta", "btn_factura", "btn_ticket"]:
-                self.query_one(f"#{bid}").variant = "default"
+            for bid in ["btn_boleta", "btn_factura", "btn_ticket"]: self.query_one(f"#{bid}").variant = "default"
             event.button.variant = "primary"
             self.comp_type = str(event.button.label)
-            
-            doc_input = self.query_one("#in_client_doc")
-            if self.comp_type == "FACTURA": doc_input.placeholder = "RUC (11 dígitos)"
-            elif self.comp_type == "BOLETA": doc_input.placeholder = "DNI (8 dígitos)"
-            else: doc_input.placeholder = "Doc. (Opcional)"
-
-        elif event.button.id in ["btn_efectivo", "btn_tarjeta", "btn_yape", "btn_mixto"]:
-            for bid in ["btn_efectivo", "btn_tarjeta", "btn_yape", "btn_mixto"]:
-                self.query_one(f"#{bid}").variant = "default"
+        elif event.button.id in ["btn_efectivo", "btn_tarjeta", "btn_yape"]:
+            for bid in ["btn_efectivo", "btn_tarjeta", "btn_yape"]: self.query_one(f"#{bid}").variant = "default"
             event.button.variant = "primary"
             self.payment_method = str(event.button.label)
-
         elif event.button.id == "btn_confirm_pay":
+            self.finalizar_proceso()
+        elif event.button.id == "btn_cancel_pay":
+            self.dismiss(None)
+
+    def finalizar_proceso(self):
+        """Valida y finaliza el proceso de venta enviando los datos del cliente y pago."""
+        name = self.query_one("#in_client_name").value.strip() or "PÚBLICO EN GENERAL"
+        doc = self.query_one("#in_client_doc").value.strip() or "00000000"
+        
+        try:
+            paid = float(self.query_one("#in_paid_amount").value or 0)
+        except ValueError:
+            self.app.notify("Monto recibido inválido.", severity="error")
+            return
+        
+        if self.comp_type == "FACTURA" and len(doc) != 11:
+            self.app.notify("RUC inválido para Factura (debe tener 11 dígitos).", severity="error")
+            return
+
+        # Guardamos solo los datos presentes en este diseño compacto
+        self.dismiss({
+            'metodo_pago': self.payment_method,
+            'tipo_comprobante': self.comp_type,
+            'monto_pagado': paid,
+            'vuelto': max(0, paid - self.total),
+            'cliente_nombre': name.upper(),
+            'cliente_documento': doc,
+            'total_final': self.total
+        })
+
+    def consultar_cliente(self):
+        doc = self.query_one("#in_client_doc").value.strip()
+        self.app.notify(f"Buscando {doc}...")
+        c = database.buscar_cliente_local(doc)
+        if c:
+            self.query_one("#in_client_name").value = c['nombre']
+            self.query_one("#in_client_dir").value = c.get('direccion') or ""
+            self.app.notify("Cliente encontrado.")
+        else:
+            self.app.notify("No encontrado localmente.")
+
+    def on_input_changed(self, event: Input.Changed):
+        if event.input.id == "in_paid_amount":
             try:
-                name = self.query_one("#in_client_name").value.strip() or "PÚBLICO EN GENERAL"
-                doc = self.query_one("#in_client_doc").value.strip() or "00000000"
-                dir = self.query_one("#in_client_dir").value.strip()
-                tel = self.query_one("#in_client_tel").value.strip()
-                email = self.query_one("#in_client_email").value.strip()
-                
-                if self.comp_type == "FACTURA":
-                    if len(doc) != 11:
-                        self.app.notify("La Factura requiere RUC de 11 dígitos.", severity="error")
-                        return
-                elif self.comp_type == "BOLETA":
-                    if len(doc) != 8 and doc != "00000000":
-                        self.app.notify("La Boleta requiere DNI de 8 dígitos.", severity="error")
-                        return
-
-                # GUARDAR/ACTUALIZAR EN LA BASE DE DATOS DE CLIENTES
-                if doc != "00000000":
-                    database.add_or_update_customer({
-                        'documento': doc, 'nombre': name, 'direccion': dir, 
-                        'telefono': tel, 'email': email
-                    })
-
-                paid = float(self.query_one("#in_paid_amount").value or 0)
-                if paid < self.total and self.payment_method == "EFECTIVO":
-                    self.app.notify("Monto insuficiente.", severity="error")
-                    return
-                
-                self.dismiss({
-                    'metodo_pago': self.payment_method,
-                    'tipo_comprobante': self.comp_type,
-                    'monto_pagado': paid,
-                    'vuelto': max(0, paid - self.total),
-                    'cliente_nombre': name.upper(),
-                    'cliente_documento': doc
-                })
-            except ValueError: self.app.notify("Monto inválido.")
-        elif event.button.id == "btn_cancel_pay": self.dismiss(None)
+                change = max(0, float(event.value or 0) - self.total)
+                self.query_one("#lbl_change").update(f"VUELTO: S/ {change:.2f}")
+            except ValueError: pass
 
     def consultar_cliente(self):
         """Consulta datos de DNI/RUC priorizando la base de datos local."""
@@ -1256,42 +1355,32 @@ class PaymentDialog(Screen):
 
         self.app.notify("Buscando cliente...", severity="information")
         
-        # 1. INTENTO LOCAL (Clientes registrados en la nueva tabla)
+        # 1. INTENTO LOCAL
         c = database.buscar_cliente_local(documento)
         if c:
             self.query_one("#in_client_name").value = str(c['nombre'] or "")
-            self.query_one("#in_client_dir").value = str(c['direccion'] or "")
-            self.query_one("#in_client_tel").value = str(c['telefono'] or "")
-            self.query_one("#in_client_email").value = str(c['email'] or "")
-            self.app.notify("¡Cliente encontrado en base de datos!")
+            self.app.notify("¡Cliente encontrado!")
             return
 
-        # 2. INTENTO POR INTERNET (Si no es cliente frecuente)
-        self.app.notify("Nuevo cliente. Consultando internet...", severity="information")
+        # 2. INTENTO POR INTERNET
+        self.app.notify("Consultando internet...", severity="information")
         tipo = "dni" if len(documento) == 8 else "ruc"
-        urls = [
-            f"https://api.apisperu.com/v1/{tipo}/{documento}",
-            f"https://dniruc.apisperu.com/api/v1/{tipo}/{documento}"
-        ]
-        headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
-        encontrado = False
+        url = f"https://api.apisperu.com/v1/{tipo}/{documento}"
+        headers = {"User-Agent": "Mozilla/5.0"}
 
-        for url in urls:
-            try:
-                response = requests.get(url, headers=headers, timeout=3)
-                if response.status_code == 200:
-                    data = response.json()
-                    nombre = data.get('nombre') or data.get('razonSocial') or data.get('nombre_completo')
-                    if nombre:
-                        self.query_one("#in_client_name").value = nombre.upper()
-                        self.app.notify("¡Datos encontrados en internet!")
-                        encontrado = True
-                        break
-            except Exception: continue
+        try:
+            response = requests.get(url, headers=headers, timeout=3)
+            if response.status_code == 200:
+                data = response.json()
+                nombre = data.get('nombre') or data.get('razonSocial') or data.get('nombre_completo')
+                if nombre:
+                    self.query_one("#in_client_name").value = nombre.upper()
+                    self.app.notify("¡Datos encontrados!")
+                    return
+        except Exception: pass
         
-        if not encontrado:
-            self.app.notify("No se pudo conectar. Ingrese datos manualmente.", severity="warning")
-            self.query_one("#in_client_name").focus()
+        self.app.notify("No se encontró. Ingrese manualmente.", severity="warning")
+        self.query_one("#in_client_name").focus()
 
     def on_input_changed(self, event: Input.Changed):
         if event.input.id == "in_paid_amount":
@@ -1299,6 +1388,43 @@ class PaymentDialog(Screen):
                 change = max(0, float(event.value or 0) - self.total)
                 self.query_one("#lbl_change").update(f"Vuelto: S/ {change:.2f}")
             except ValueError: pass
+
+    def modify_qty(self, delta):
+        """Aumenta o disminuye la cantidad del producto seleccionado."""
+        try:
+            table = self.query_one("#pay_confirm_table")
+            if table.cursor_row is not None:
+                # El código es la clave de fila en DataTable o lo obtenemos de la base de datos (aquí usamos el nombre como referencia si no hay clave)
+                # Pero lo más seguro es obtener el código del carrito basándonos en la fila
+                codes = list(self.cart.keys())
+                code = codes[table.cursor_row]
+                
+                new_qty = self.cart[code][1] + delta
+                if new_qty > 0:
+                    # Verificar stock
+                    if new_qty <= self.cart[code][3]:
+                        self.cart[code][1] = new_qty
+                        self.refresh_confirm_table()
+                    else:
+                        self.app.notify(f"No hay más stock disponible de {self.cart[code][0]}", severity="error")
+                elif new_qty == 0:
+                    self.remove_item()
+        except Exception as e:
+            self.app.notify(f"Seleccione un producto para editar. {e}", severity="error")
+
+    def remove_item(self):
+        """Elimina el producto seleccionado del carrito de confirmación."""
+        try:
+            table = self.query_one("#pay_confirm_table")
+            if table.cursor_row is not None:
+                codes = list(self.cart.keys())
+                code = codes[table.cursor_row]
+                del self.cart[code]
+                self.refresh_confirm_table()
+                if not self.cart:
+                    self.dismiss(None) # Si vacía todo, cerramos el diálogo
+        except Exception:
+            self.app.notify("Seleccione un producto para eliminar.", severity="error")
 
 class FinalReceiptScreen(Screen):
     def __init__(self, cart, total, pay_data, correlativo):
@@ -1309,14 +1435,132 @@ class FinalReceiptScreen(Screen):
         self.correlativo = correlativo
 
     def compose(self) -> ComposeResult:
-        # Formato visual para la pantalla
         receipt = self.generar_texto_ticket()
         with Vertical(classes="modal-container", id="final-receipt-container"):
+            yield Label("¡VENTA FINALIZADA CON ÉXITO!", id="modal_title")
             yield Static(receipt, id="ticket_text_view")
-            with Horizontal(classes="form-buttons"):
-                yield Button("Ticket Texto (Rápido)", variant="success", id="btn_print_thermal")
-                yield Button("Imprimir HTML (80mm)", variant="success", id="btn_print_html")
-                yield Button("Cerrar y Nueva Venta", variant="primary", id="btn_done")
+            
+            # ORGANIZACIÓN EN GRID PARA QUE TODO QUEPA BIEN
+            with Grid(id="receipt-buttons-grid"):
+                yield Button("Ticket 80mm", variant="success", id="btn_print_html")
+                yield Button("Formato A4 (PDF)", variant="primary", id="btn_print_a4")
+                yield Button("WhatsApp 📱", variant="success", id="btn_whatsapp")
+                yield Button("Correo 📧", variant="primary", id="btn_email")
+            
+            yield Button("NUEVA VENTA / CERRAR", variant="error", id="btn_done")
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_print_html":
+            self.imprimir_ticket_html()
+        elif event.button.id == "btn_print_a4":
+            self.generar_pdf_a4()
+        elif event.button.id == "btn_whatsapp":
+            self.enviar_whatsapp()
+        elif event.button.id == "btn_email":
+            self.enviar_correo()
+        elif event.button.id == "btn_done":
+            self.app.pop_screen()
+
+    def generar_pdf_a4(self):
+        """Genera un PDF profesional en formato A4."""
+        try:
+            os.makedirs("ventas", exist_ok=True)
+            filename = os.path.join("ventas", f"Factura_A4_{self.correlativo}.pdf")
+            
+            pdf = FPDF()
+            pdf.add_page()
+            
+            # Encabezado Empresa
+            pdf.set_font("Arial", "B", 16)
+            pdf.cell(0, 10, "FERRETERÍA ROLIK", ln=True, align="L")
+            pdf.set_font("Arial", "", 10)
+            pdf.cell(0, 5, "RUC: 10440809320", ln=True)
+            pdf.cell(0, 5, "Dirección: Mz A lt 26 P.I. Madera KM 15.5", ln=True)
+            pdf.cell(0, 5, "Tel: 988352912 / 932326764", ln=True)
+            
+            # Recuadro del Comprobante (Derecha)
+            pdf.set_xy(130, 10)
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(70, 25, "", border=1) # Recuadro
+            pdf.set_xy(130, 12)
+            pdf.cell(70, 7, f"R.U.C. 10440809320", ln=True, align="C")
+            pdf.set_xy(130, 19)
+            pdf.cell(70, 7, self.pay_data['tipo_comprobante'], ln=True, align="C")
+            pdf.set_xy(130, 26)
+            pdf.cell(70, 7, self.correlativo, ln=True, align="C")
+            
+            pdf.set_xy(10, 45)
+            pdf.set_font("Arial", "B", 10)
+            pdf.cell(0, 10, "DATOS DEL CLIENTE", ln=True)
+            pdf.set_font("Arial", "", 10)
+            pdf.cell(0, 6, f"Señor(es): {self.pay_data.get('cliente_nombre', 'PÚBLICO GENERAL')}", ln=True)
+            pdf.cell(0, 6, f"Documento: {self.pay_data.get('cliente_documento', '00000000')}", ln=True)
+            pdf.cell(0, 6, f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True)
+            pdf.ln(5)
+
+            # Tabla de Productos
+            pdf.set_font("Arial", "B", 10)
+            pdf.set_fill_color(240, 240, 240)
+            pdf.cell(20, 10, "Cant.", 1, 0, "C", True)
+            pdf.cell(110, 10, "Descripción", 1, 0, "L", True)
+            pdf.cell(30, 10, "P. Unit", 1, 0, "R", True)
+            pdf.cell(30, 10, "Total", 1, 1, "R", True)
+
+            pdf.set_font("Arial", "", 10)
+            for _, item in self.cart.items():
+                # [nombre, qty, price, stock, marca, unidad]
+                sub = item[1] * item[2]
+                pdf.cell(20, 8, str(item[1]), 1, 0, "C")
+                pdf.cell(110, 8, str(item[0])[:50], 1, 0, "L")
+                pdf.cell(30, 8, f"{item[2]:.2f}", 1, 0, "R")
+                pdf.cell(30, 8, f"{sub:.2f}", 1, 1, "R")
+
+            # Totales
+            pdf.ln(5)
+            subtotal = self.total / 1.18
+            igv = self.total - subtotal
+            pdf.set_font("Arial", "B", 10)
+            pdf.cell(160, 8, "SUBTOTAL S/", 0, 0, "R")
+            pdf.cell(30, 8, f"{subtotal:.2f}", 1, 1, "R")
+            pdf.cell(160, 8, "I.G.V. (18%) S/", 0, 0, "R")
+            pdf.cell(30, 8, f"{igv:.2f}", 1, 1, "R")
+            pdf.cell(160, 8, "TOTAL FINAL S/", 0, 0, "R")
+            pdf.set_fill_color(255, 255, 200)
+            pdf.cell(30, 8, f"{self.total:.2f}", 1, 1, "R", True)
+
+            pdf.output(filename)
+            self.app.notify(f"PDF A4 generado: {filename}", severity="information")
+            if os.name == 'nt': os.startfile(filename)
+        except Exception as e:
+            self.app.notify(f"Error PDF A4: {e}", severity="error")
+
+    def enviar_whatsapp(self):
+        """Abre WhatsApp Web con un mensaje predeterminado."""
+        telefono = self.pay_data.get('cliente_tel', '').strip()
+        if not telefono or len(telefono) < 9:
+            self.app.notify("El cliente no tiene un teléfono válido registrado.", severity="warning")
+            return
+        
+        mensaje = f"Hola *{self.pay_data['cliente_nombre']}*, le enviamos su comprobante *{self.correlativo}* de *FERRETERÍA ROLIK* por un total de *S/ {self.total:.2f}*. ¡Gracias por su compra!"
+        import urllib.parse
+        encoded_msg = urllib.parse.quote(mensaje)
+        url = f"https://web.whatsapp.com/send?phone=51{telefono}&text={encoded_msg}"
+        webbrowser.open(url)
+        self.app.notify("Abriendo WhatsApp Web...")
+
+    def enviar_correo(self):
+        """Prepara un correo electrónico con los datos de la venta."""
+        email = self.pay_data.get('cliente_email', '').strip()
+        if not email:
+            self.app.notify("El cliente no tiene un correo registrado.", severity="warning")
+            return
+        
+        subject = f"Comprobante de Pago {self.correlativo} - FERRETERIA ROLIK"
+        body = f"Estimado cliente,\n\nSe adjunta la informacion de su compra por S/ {self.total:.2f}.\nNumero de comprobante: {self.correlativo}\n\nGracias por su preferencia."
+        import urllib.parse
+        url = f"mailto:{email}?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
+        webbrowser.open(url)
+        self.app.notify("Abriendo gestor de correo...")
 
     def generar_html_ticket(self):
         """Genera un archivo HTML con estilo profesional para ticketeras de 80mm."""
@@ -1423,20 +1667,6 @@ class FinalReceiptScreen(Screen):
         else:
             self.app.pop_screen()
 
-    def imprimir_ticket_html(self):
-        """Genera y abre el ticket en formato HTML."""
-        try:
-            filename = f"Ticket_{self.correlativo}.html"
-            content = self.generar_html_ticket()
-            with open(filename, "w", encoding="utf-8") as f:
-                f.write(content)
-            
-            self.app.notify(f"HTML generado: {filename}", severity="information")
-            if os.name == 'nt':
-                os.startfile(filename) # Forma nativa y segura en Windows
-        except Exception as e:
-            self.app.notify(f"Error HTML: {e}", severity="error")
-
     def generar_texto_ticket(self):
         """Genera el contenido del ticket compacto para ticketera de 80mm."""
         w = 36 # Ancho reducido para evitar desbordes
@@ -1480,16 +1710,11 @@ class FinalReceiptScreen(Screen):
         t += f"{'='*w}\n\n\n" # Espacio final para el corte manual
         return t
 
-    def on_button_pressed(self, event: Button.Pressed):
-        if event.button.id == "btn_print_thermal":
-            self.imprimir_ticket_archivo()
-        else:
-            self.app.pop_screen()
-
     def imprimir_ticket_archivo(self):
         """Guarda el ticket en un archivo .txt listo para enviar a la ticketera."""
         try:
-            filename = f"Ticket_{self.correlativo}.txt"
+            os.makedirs("ventas", exist_ok=True)
+            filename = os.path.join("ventas", f"Ticket_{self.correlativo}.txt")
             content = self.generar_texto_ticket()
             with open(filename, "w", encoding="utf-8") as f:
                 f.write(content)
@@ -1500,42 +1725,161 @@ class FinalReceiptScreen(Screen):
         except Exception as e:
             self.app.notify(f"Error al imprimir: {e}", severity="error")
 
+    def imprimir_ticket_html(self):
+        """Genera y abre el ticket en formato HTML."""
+        try:
+            os.makedirs("ventas", exist_ok=True)
+            filename = os.path.join("ventas", f"Ticket_{self.correlativo}.html")
+            content = self.generar_html_ticket()
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(content)
+            
+            self.app.notify(f"HTML generado: {filename}", severity="information")
+            if os.name == 'nt':
+                os.startfile(filename)
+        except Exception as e:
+            self.app.notify(f"Error HTML: {e}", severity="error")
+
 class CashScreen(Screen):
     BINDINGS = [Binding("escape", "app.pop_screen", "Volver")]
     
     def compose(self) -> ComposeResult:
-        with Vertical(classes="form-container"):
-            yield Label("GESTIÓN DE CAJA", id="modal_title"); yield Static(id="cash_status_label")
+        with Vertical(classes="modal-container", id="cash-panel"):
+            yield Label("GESTIÓN PROFESIONAL DE CAJA", id="modal_title")
+            yield Static(id="cash_status_label", classes="status-banner")
+            
+            # Panel de Apertura
             with Vertical(id="open_cash_container"):
-                yield Label("Monto Inicial:")
+                yield Label("Monto Inicial (Fondo de Sencillo):")
                 yield Input("0.00", id="in_initial_fund", restrict=r"[0-9.]*")
-                yield Button("Abrir Caja", variant="success", id="btn_open_cash")
-            with Vertical(id="close_cash_container"):
-                yield Static(id="sales_summary_label")
-                yield Button("Cerrar Caja", variant="error", id="btn_close_cash")
-            yield Button("Volver", variant="primary", id="btn_back")
+                yield Button("ABRIR CAJA", variant="success", id="btn_open_cash")
+            
+            # Panel de Operaciones (Solo si está abierta)
+            with Vertical(id="ops_cash_container"):
+                with Horizontal(classes="cash-ops-row"):
+                    yield Button("INGRESAR DINERO", id="btn_cash_in", variant="primary")
+                    yield Button("RETIRAR DINERO", id="btn_cash_out", variant="error")
+                
+                with Horizontal(classes="cash-ops-row"):
+                    yield Button("CORTE X (Ver Resumen)", id="btn_corte_x", variant="warning")
+                    yield Button("CERRAR CAJA (Corte Z)", id="btn_close_cash", variant="error")
+            
+            yield Button("HISTORIAL DE CAJAS", id="btn_cash_history", variant="primary")
+            yield Button("VOLVER (ESC)", variant="error", id="btn_back")
     
-    def on_mount(self): self.refresh_cash_status()
+    def on_mount(self): 
+        self.refresh_cash_status()
     
     def refresh_cash_status(self):
         session = database.get_active_session()
-        self.query_one("#open_cash_container").display = not session
-        self.query_one("#close_cash_container").display = bool(session)
-        if session:
-            self.query_one("#cash_status_label").update(f"CAJA ABIERTA (Desde: {session['open_date']})")
-            total_sales = database.get_sales_for_session(session['id'])
-            self.query_one("#sales_summary_label").update(f"Ventas Totales: ${total_sales:.2f}")
-        else: self.query_one("#cash_status_label").update("CAJA CERRADA")
+        is_open = bool(session)
+        self.query_one("#open_cash_container").display = not is_open
+        self.query_one("#ops_cash_container").display = is_open
+        
+        banner = self.query_one("#cash_status_label")
+        if is_open:
+            banner.update(f"ESTADO: CAJA ABIERTA | Inicio: {session['open_date'][:16]}")
+            banner.add_class("status-open")
+        else:
+            banner.update("ESTADO: CAJA CERRADA")
+            banner.remove_class("status-open")
     
     def on_button_pressed(self, event: Button.Pressed):
+        session = database.get_active_session()
+        
         if event.button.id == "btn_open_cash":
-            if (fund_str := self.query_one("#in_initial_fund", Input).value): database.open_cash_session(float(fund_str), self.app.user_id); self.app.notify("Caja abierta.", severity="success"); self.refresh_cash_status()
-            else: self.app.notify("Ingrese el monto inicial.", severity="error")
+            fund = float(self.query_one("#in_initial_fund").value or 0)
+            database.open_cash_session(fund, self.app.user_id)
+            self.app.notify("Caja abierta correctamente.", severity="success")
+            self.refresh_cash_status()
+            
+        elif event.button.id == "btn_cash_in":
+            self.app.push_screen(MovementDialog("INGRESO"), lambda _: self.refresh_cash_status())
+            
+        elif event.button.id == "btn_cash_out":
+            self.app.push_screen(MovementDialog("RETIRO"), lambda _: self.refresh_cash_status())
+            
+        elif event.button.id == "btn_corte_x":
+            if session: self.app.push_screen(CorteXDialog(session['id']))
+            
         elif event.button.id == "btn_close_cash":
-            if session := database.get_active_session():
-                total_sales = database.get_sales_for_session(session['id'])
-                database.close_cash_session(session['id'], total_sales, self.app.user_id); self.app.notify(f"Caja cerrada. Total Ventas: ${total_sales:.2f}", severity="success"); self.refresh_cash_status()
-        elif event.button.id == "btn_back": self.app.pop_screen()
+            if session:
+                summary = database.get_cash_session_summary(session['id'])
+                database.close_cash_session(session['id'], summary['total_general'], self.app.user_id)
+                self.app.notify("Caja cerrada. Se ha generado el reporte final.", severity="success")
+                self.refresh_cash_status()
+        
+        elif event.button.id == "btn_cash_history":
+            self.app.push_screen(CashReportScreen())
+            
+        elif event.button.id == "btn_back":
+            self.app.pop_screen()
+
+class MovementDialog(Screen):
+    """Diálogo para registrar ingresos o retiros manuales."""
+    def __init__(self, tipo):
+        super().__init__()
+        self.tipo = tipo
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal-container", id="mov-dialog"):
+            yield Label(f"REGISTRAR {self.tipo}", id="modal_title")
+            yield Label("Monto:")
+            yield Input("0.00", id="mov_amount", restrict=r"[0-9.]*")
+            yield Label("Descripción / Motivo:")
+            yield Input(placeholder="Ej: Pago de luz, Sencillo, etc.", id="mov_desc")
+            with Horizontal(classes="form-buttons"):
+                yield Button("Guardar", variant="success", id="btn_save_mov")
+                yield Button("Cancelar", variant="error", id="btn_cancel_mov")
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_save_mov":
+            monto = float(self.query_one("#mov_amount").value or 0)
+            desc = self.query_one("#mov_desc").value.strip()
+            session = database.get_active_session()
+            if monto > 0 and session:
+                database.add_cash_movement(session['id'], self.app.user_id, self.tipo, monto, desc)
+                self.app.notify(f"{self.tipo} registrado correctamente.")
+                self.dismiss(True)
+        else:
+            self.dismiss(False)
+
+class CorteXDialog(Screen):
+    """Diálogo que muestra el resumen en tiempo real de la caja."""
+    def __init__(self, session_id):
+        super().__init__()
+        self.session_id = session_id
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal-container", id="cortex-dialog"):
+            yield Label("CORTE X - RESUMEN DE CAJA", id="modal_title")
+            yield Static(id="cortex_content", classes="receipt-text-area")
+            yield Button("Cerrar", variant="primary", id="btn_close_cortex")
+
+    def on_mount(self):
+        res = database.get_cash_session_summary(self.session_id)
+        
+        text = f"{'='*36}\n"
+        text += f"FONDO INICIAL:   S/ {res['inicial']:>10.2f}\n"
+        text += f"{'-'*36}\n"
+        text += "VENTAS POR METODO:\n"
+        for metodo, total in res['ventas'].items():
+            text += f"  {metodo:<15} S/ {total:>10.2f}\n"
+        
+        text += f"{'-'*36}\n"
+        text += "MOVIMIENTOS MANUALES:\n"
+        text += f"  INGRESOS (+)    S/ {res['movimientos'].get('INGRESO', 0):>10.2f}\n"
+        text += f"  RETIROS  (-)    S/ {res['movimientos'].get('RETIRO', 0):>10.2f}\n"
+        
+        text += f"{'='*36}\n"
+        text += f"EFECTIVO ESPERADO: S/ {res['efectivo_esperado']:>10.2f}\n"
+        text += f"TOTAL GENERAL:     S/ {res['total_general']:>10.2f}\n"
+        text += f"{'='*36}\n"
+        
+        self.query_one("#cortex_content").update(text)
+
+    def on_button_pressed(self, event: Button.Pressed):
+        self.dismiss()
 
 # --- Módulo de Órdenes de Compra ---
 class SalesReportScreen(Screen):
@@ -1592,8 +1936,8 @@ class SalesReportScreen(Screen):
                 )
                 total_sales_amount += sale['transaction_total']
             
-            table.add_row("", "", "", "", key="total-row", classes="footer")
-            table.add_row("TOTAL:", "", "", f"${total_sales_amount:.2f}", key="total-row-val", classes="footer")
+            table.add_row("", "", "", "", key="total-row")
+            table.add_row("TOTAL:", "", "", f"${total_sales_amount:.2f}", key="total-row-val")
 
         except Exception as e:
             self.app.notify(f"Error al cargar el reporte de ventas: {e}", severity="error")
@@ -1947,8 +2291,29 @@ class TopProductsReportScreen(Screen):
     def on_button_pressed(self, event: Button.Pressed):
         self.app.pop_screen()
 
+class VoidReasonDialog(Screen):
+    """Diálogo para ingresar el motivo de anulación de una venta."""
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="modal-container", id="void-reason-container"):
+            yield Label("ANULACIÓN DE VENTA", id="modal_title")
+            yield Label("¿Por qué desea anular esta venta?")
+            yield Input(placeholder="Ingrese el motivo aquí...", id="in_void_reason")
+            with Horizontal(classes="form-buttons"):
+                yield Button("ANULAR VENTA", variant="error", id="btn_confirm_void")
+                yield Button("Cancelar", variant="primary", id="btn_cancel_void")
+
+    def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "btn_confirm_void":
+            reason = self.query_one("#in_void_reason").value.strip()
+            if len(reason) < 5:
+                self.app.notify("Por favor, ingrese un motivo válido (mín. 5 letras).", severity="error")
+                return
+            self.dismiss(reason)
+        else:
+            self.dismiss(None)
+
 class SalesHistoryReportScreen(Screen):
-    """Muestra la lista de todos los comprobantes de venta generados."""
+    """Muestra la lista de todos los comprobantes de venta generados con opción a anulación."""
     def compose(self) -> ComposeResult:
         yield Header()
         yield Label("HISTORIAL DE COMPROBANTES GENERADOS", id="section_title")
@@ -1956,36 +2321,42 @@ class SalesHistoryReportScreen(Screen):
         with Horizontal(classes="form-buttons"):
             yield Button("Ver Recibo (V)", variant="primary", id="btn_view_receipt")
             yield Button("Editar Recibo (E)", variant="warning", id="btn_edit_receipt")
+            yield Button("ANULAR VENTA", variant="error", id="btn_void_sale")
             yield Button("Cerrar", variant="error", id="btn_close")
         yield Footer()
 
     def on_mount(self):
         table = self.query_one(DataTable)
-        table.add_columns("Fecha", "Comprobante", "Cliente", "Total", "ID")
+        # 6 columnas: 0:Fecha, 1:Comp, 2:Cliente, 3:Total, 4:Estado, 5:ID
+        table.add_columns("Fecha", "Comprobante", "Cliente", "Total", "Estado", "ID")
         table.cursor_type = "row"
-        self.refresh_list()
+        self.refresh_history()
 
     def refresh_history(self):
         table = self.query_one(DataTable)
         table.clear()
-        sales = database.get_sales_history()
+        
+        conn = database.get_connection()
+        sales = conn.execute("""
+            SELECT t.id, t.date, t.total, t.status, t.tipo_comprobante, t.correlativo, t.cliente_nombre
+            FROM transactions t
+            ORDER BY t.date DESC
+        """).fetchall()
+        conn.close()
+
         for s in sales:
-            conn = database.get_connection()
-            extra = conn.execute("SELECT tipo_comprobante, correlativo, cliente_nombre FROM transactions WHERE id = ?", (s['transaction_id'],)).fetchone()
-            conn.close()
-            
-            comp = f"{extra['tipo_comprobante']} {extra['correlativo']}" if extra else "TICKET"
-            # Corregido: Manejamos el caso donde cliente_nombre sea None
-            cliente_raw = extra['cliente_nombre'] if (extra and extra['cliente_nombre']) else "P. GENERAL"
-            cliente_display = str(cliente_raw)[:20]
+            status_text = "COMPLETADA" if s['status'] != 'VOIDED' else "[ANULADA]"
+            comp = f"{s['tipo_comprobante']} {s['correlativo']}"
+            cliente = str(s['cliente_nombre'] or "P. GENERAL")[:20]
             
             table.add_row(
-                str(s['transaction_date'])[:16],
+                str(s['date'])[:16],
                 comp,
-                cliente_display,
-                f"S/ {s['transaction_total']:.2f}",
-                str(s['transaction_id']),
-                key=str(s['transaction_id'])
+                cliente,
+                f"S/ {s['total']:.2f}",
+                status_text,
+                str(s['id']),
+                key=str(s['id'])
             )
 
     def on_button_pressed(self, event: Button.Pressed):
@@ -1993,24 +2364,53 @@ class SalesHistoryReportScreen(Screen):
             self.action_view_receipt()
         elif event.button.id == "btn_edit_receipt":
             self.action_edit_receipt()
-        else:
+        elif event.button.id == "btn_void_sale":
+            self.action_void_sale()
+        elif event.button.id == "btn_close":
             self.app.pop_screen()
 
     def action_view_receipt(self):
         try:
             table = self.query_one(DataTable)
-            trans_id = int(table.get_cell_at((table.cursor_row, 4)))
-            self.app.push_screen(ViewReceiptDialog(trans_id))
+            if table.cursor_row is not None:
+                trans_id = int(table.get_cell_at((table.cursor_row, 5)))
+                self.app.push_screen(ViewReceiptDialog(trans_id))
         except Exception:
-            self.app.notify("Seleccione una venta.", severity="error")
+            self.app.notify("Seleccione una venta para visualizar.", severity="error")
 
     def action_edit_receipt(self):
         try:
             table = self.query_one(DataTable)
-            trans_id = int(table.get_cell_at((table.cursor_row, 4)))
-            self.app.push_screen(EditSaleScreen(trans_id), lambda success: self.refresh_history() if success else None)
+            if table.cursor_row is not None:
+                trans_id = int(table.get_cell_at((table.cursor_row, 5)))
+                self.app.push_screen(EditSaleScreen(trans_id), lambda success: self.refresh_history() if success else None)
         except Exception:
             self.app.notify("Seleccione una venta para editar.", severity="error")
+
+    def action_void_sale(self):
+        if self.app.user_role != 'admin':
+            self.app.notify("Solo un administrador puede anular ventas.", severity="error")
+            return
+        try:
+            table = self.query_one(DataTable)
+            if table.cursor_row is not None:
+                trans_id = int(table.get_cell_at((table.cursor_row, 5)))
+                status = table.get_cell_at((table.cursor_row, 4))
+                if status == "[ANULADA]":
+                    self.app.notify("Esta venta ya fue anulada.", severity="warning")
+                    return
+                
+                def confirm_void(reason):
+                    if reason:
+                        success, msg = database.void_sale(trans_id, self.app.user_id, reason)
+                        if success:
+                            self.app.notify(msg, severity="success")
+                            self.refresh_history()
+                        else:
+                            self.app.notify(f"Error: {msg}", severity="error")
+                self.app.push_screen(VoidReasonDialog(), confirm_void)
+        except Exception:
+            self.app.notify("Seleccione una venta para anular.", severity="error")
 
     def refresh_list(self):
         self.refresh_history()
@@ -2114,6 +2514,8 @@ class EditSaleScreen(Screen):
 
 class ViewReceiptDialog(Screen):
     """Ventana para visualizar un recibo guardado en el historial."""
+    BINDINGS = [Binding("escape", "dismiss", "Cerrar")]
+
     def __init__(self, transaction_id):
         super().__init__()
         self.trans_id = transaction_id
@@ -2127,7 +2529,7 @@ class ViewReceiptDialog(Screen):
             with Horizontal(classes="form-buttons"):
                 yield Button("Ticket Texto", variant="success", id="btn_print_receipt")
                 yield Button("Ticket HTML", variant="success", id="btn_print_html_view")
-                yield Button("Cerrar", variant="error", id="btn_close_view")
+                yield Button("Cerrar (ESC)", variant="error", id="btn_close_view")
 
     def on_mount(self):
         sale_row, items_row = database.get_sale_full_details(self.trans_id)
@@ -2168,7 +2570,8 @@ class ViewReceiptDialog(Screen):
     def imprimir_ticket_html_reprint(self):
         """Genera y abre el HTML para un ticket antiguo."""
         try:
-            filename = f"Ticket_{self.correlativo}.html"
+            os.makedirs("ventas", exist_ok=True)
+            filename = os.path.join("ventas", f"Ticket_{self.correlativo}.html")
             items_html = ""
             for item in self.items_list:
                 items_html += f"<tr><td>{item['quantity']}</td><td>{item['nombre'][:25]}</td><td style='text-align: right;'>{(item['quantity']*item['unit_price']):.2f}</td></tr>"
@@ -2195,7 +2598,8 @@ class ViewReceiptDialog(Screen):
             self.app.notify("No hay contenido de recibo para imprimir.", severity="error")
             return
         try:
-            filename = f"Ticket_{self.correlativo}.txt"
+            os.makedirs("ventas", exist_ok=True)
+            filename = os.path.join("ventas", f"Ticket_{self.correlativo}.txt")
             with open(filename, "w", encoding="utf-8") as f:
                 f.write(self.receipt_content)
             
@@ -2648,9 +3052,30 @@ class ERPApp(App):
     CSS = """
     Screen { background: #1a1b26; color: #c0caf5; }
     #menu_container { align: center middle; height: 100%; }
-    #title { text-align: center; width: 100%; padding: 1; margin-bottom: 2; background: #7aa2f7; color: #1a1b26; text-style: bold; }
+    #buttons_grid {
+        layout: grid;
+        grid-size: 3;
+        grid-gutter: 1;
+        padding: 1;
+        align: center middle;
+        width: 100%;
+        height: auto;
+    }
+    #buttons_grid Button {
+        width: 100%;
+        height: 3;
+        text-style: bold;
+        margin: 0;
+    }
+    #title { text-align: center; width: 100%; padding: 1; margin-bottom: 1; background: #7aa2f7; color: #1a1b26; text-style: bold; }
     #section_title { text-align: center; width: 100%; padding: 1; background: #bb9af7; color: #1a1b26; text-style: bold; }
-    Button { width: 30; margin: 1; }
+    Button { width: 35; height: 3; text-style: bold; }
+    #inventory_actions Button, #po_actions Button, #user_actions Button, #customer_actions Button {
+        width: auto;
+        min-width: 16;
+        height: 3;
+        margin: 0 1;
+    }
     #inventory_actions, #po_actions, #user_actions, #report_actions { height: auto; padding: 1; align: center middle; }
     #search_sort_bar {
         align: center middle;
@@ -2754,7 +3179,7 @@ class ERPApp(App):
     }
     #receipt-view-dialog {
         width: 60;
-        height: 45;
+        height: 55;
         border: thick #7aa2f7;
         background: #1a1b26;
     }
@@ -2831,18 +3256,95 @@ class ERPApp(App):
         align: center middle;
     }
     .options-row Button {
-        width: 15;
+        width: 12;
         margin: 0 1;
+        height: 3;
     }
     #search_results_table {
         height: 20;
         border: solid #7aa2f7;
     }
-    .opt-btn { width: 15; margin: 0 1; background: #3b4261; }
+    .opt-btn { width: 12; margin: 0 1; background: #3b4261; }
     .opt-btn:focus { background: #7aa2f7; color: #1a1b26; }
     #lbl_change { margin-top: 1; padding: 1; border: solid #7aa2f7; text-align: center; color: #7aa2f7; text-style: bold; }
     #pos_in_search { width: 100%; margin-bottom: 1; }
     #in_paid_amount { margin-top: 1; }
+    #pay-dialog-full {
+        width: 110;
+        height: 60;
+        border: thick #7aa2f7;
+        background: #1a1b26;
+        padding: 1;
+    }
+    #pay_top_grid {
+        layout: grid;
+        grid-size: 2;
+        height: 18;
+        grid-gutter: 2;
+        margin-bottom: 1;
+    }
+    .pay_box {
+        border: solid #3b4261;
+        padding: 1;
+        background: #24283b;
+    }
+    #pay_bottom_container {
+        border: solid #7aa2f7;
+        background: #1a1b26;
+        padding: 1;
+        height: auto;
+    }
+    #pay_confirm_table {
+        height: 14;
+        margin: 1 0;
+        border: solid #3b4261;
+    }
+    #pay_extra_search_row {
+        height: 3;
+        margin: 1 0;
+    }
+    #in_pay_extra_search {
+        width: 100%;
+        border: double #bb9af7;
+    }
+    #pay_edit_controls {
+        height: 3;
+        align: center middle;
+        margin-bottom: 1;
+    }
+    #pay_edit_controls Button {
+        width: 20;
+        margin: 0 1;
+    }
+    #pay_confirm_subtotal {
+        text-align: right;
+        text-style: bold;
+        color: #f7768e;
+        background: #24283b;
+        padding: 1;
+        border-top: double #7aa2f7;
+    }
+    #receipt-buttons-grid {
+        layout: grid;
+        grid-size: 2;
+        grid-gutter: 1;
+        margin: 1 0;
+        height: auto;
+        width: 100%;
+    }
+    #receipt-buttons-grid Button {
+        width: 100%;
+        height: 3;
+    }
+    #btn_done {
+        width: 100%;
+        margin-top: 1;
+    }
+    #final-receipt-container {
+        width: 65;
+        height: auto;
+        padding: 1 2;
+    }
     """
     
     def __init__(self, *args, **kwargs):

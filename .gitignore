@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+build/
+dist/
+*.db
+*.spec
+.gemini/
+ventas/
+reportes/*.xlsx
+servidor_api/backups_sistema/
+*.zip
+*.log

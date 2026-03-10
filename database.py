@@ -1,12 +1,32 @@
 import sqlite3
+import os
+import zipfile
+import hashlib
+from datetime import datetime, timedelta, timezone
+
+def hash_password(password):
+    """Genera un hash seguro para la contraseña."""
+    if not password: return ""
+    # SHA-256 es un estándar de seguridad robusto
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def get_lima_time():
+    # Lima es UTC-5
+    tz_lima = timezone(timedelta(hours=-5))
+    return datetime.now(tz_lima).strftime('%Y-%m-%d %H:%M:%S')
+
 from datetime import datetime
 
-DB_NAME = "erp_system.db"
+# Obtener la ruta absoluta de la carpeta donde está este archivo
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_NAME = os.path.join(BASE_DIR, "erp_system.db")
 
 def get_connection():
-    """Obtiene una conexión a la base de datos."""
-    conn = sqlite3.connect(DB_NAME)
+    """Obtiene una conexión a la base de datos con modo WAL y llaves foráneas habilitadas."""
+    conn = sqlite3.connect(DB_NAME, timeout=10) # Mayor timeout para evitar "database is locked"
     conn.row_factory = sqlite3.Row  # Devuelve filas como diccionarios
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA foreign_keys=ON;")
     return conn
 
 def init_db():
@@ -22,34 +42,57 @@ def init_db():
             ruc_dni TEXT,
             direccion TEXT,
             telefono TEXT,
-            email TEXT
+            email TEXT,
+            deleted_at TIMESTAMP DEFAULT NULL
         )
     ''')
 
     # Añadir columnas a suppliers si no existen
-    for col, col_type in [("ruc_dni", "TEXT"), ("direccion", "TEXT"), ("telefono", "TEXT"), ("email", "TEXT")]:
+    for col, col_type in [("ruc_dni", "TEXT"), ("direccion", "TEXT"), ("telefono", "TEXT"), ("email", "TEXT"), ("deleted_at", "TIMESTAMP DEFAULT NULL")]:
         try:
             cursor.execute(f"ALTER TABLE suppliers ADD COLUMN {col} {col_type}")
         except sqlite3.OperationalError: pass
 
-    # Tabla de Productos
+    # Tabla de Productos (Estructura Profesional)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS products (
-            codigo TEXT PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            codigo TEXT UNIQUE NOT NULL,
             nombre TEXT NOT NULL,
             fabricante TEXT,
             categoria TEXT,
             descripcion TEXT,
             precio_venta REAL DEFAULT 0.0,
-            precio_compra REAL DEFAULT 0.0,
+            precio_compra REAL DEFAULT 0.0, -- Último precio de compra
+            costo_promedio REAL DEFAULT 0.0, -- Valor contable calculado
             unidad TEXT,
-            stock INTEGER DEFAULT 0,
+            stock_actual INTEGER DEFAULT 0,
             stock_minimo INTEGER DEFAULT 5,
+            stock_maximo INTEGER DEFAULT 100,
             proveedor_id INTEGER,
             fecha_ingreso TIMESTAMP,
+            deleted_at TIMESTAMP DEFAULT NULL,
             FOREIGN KEY (proveedor_id) REFERENCES suppliers(id)
         )
     ''')
+
+    # Asegurar que todas las columnas necesarias existan (Migración forzada)
+    columnas_necesarias = [
+        ("codigo", "TEXT UNIQUE"),
+        ("stock_actual", "INTEGER DEFAULT 0"),
+        ("stock_maximo", "INTEGER DEFAULT 100"),
+        ("costo_promedio", "REAL DEFAULT 0.0"),
+        ("fecha_actualizacion_precio", "TIMESTAMP"),
+        ("unidad", "TEXT DEFAULT 'Und'"),
+        ("deleted_at", "TIMESTAMP DEFAULT NULL")
+    ]
+    for col, col_type in columnas_necesarias:
+        try:
+            cursor.execute(f"ALTER TABLE products ADD COLUMN {col} {col_type}")
+        except sqlite3.OperationalError:
+            pass # La columna ya existe
+    
+    conn.commit()
 
     # Tabla de Órdenes de Compra
     cursor.execute('''
@@ -57,7 +100,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             numero_oc TEXT UNIQUE,
             proveedor_id INTEGER,
-            fecha_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            fecha_pedido TIMESTAMP ,
             fecha_llegada TIMESTAMP,
             fecha_estimada DATE,
             estado TEXT DEFAULT 'PENDIENTE',
@@ -94,7 +137,7 @@ def init_db():
             cantidad INTEGER,
             precio_compra_unitario REAL,
             FOREIGN KEY (pedido_id) REFERENCES purchase_orders(id),
-            FOREIGN KEY (producto_codigo) REFERENCES products(id)
+            FOREIGN KEY (producto_codigo) REFERENCES products(codigo)
         )
     ''')
 
@@ -102,7 +145,7 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS cash_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            open_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            open_date TIMESTAMP ,
             close_date TIMESTAMP,
             initial_fund REAL DEFAULT 0.0,
             total_sales REAL DEFAULT 0.0,
@@ -113,7 +156,7 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            date TIMESTAMP ,
             session_id INTEGER,
             total REAL,
             metodo_pago TEXT, -- Efectivo, Tarjeta, Yape, Mixto, etc.
@@ -133,7 +176,10 @@ def init_db():
         ("correlativo", "TEXT"), ("monto_pagado", "REAL"), 
         ("vuelto", "REAL"), ("cliente_nombre", "TEXT"), 
         ("cliente_documento", "TEXT"), ("cliente_direccion", "TEXT"),
-        ("cliente_telefono", "TEXT"), ("cliente_email", "TEXT")
+        ("cliente_telefono", "TEXT"), ("cliente_email", "TEXT"),
+        ("status", "TEXT DEFAULT 'COMPLETED'"), # Nueva columna para anulación
+        ("voided_by_user_id", "INTEGER"),        # Quién anuló
+        ("void_reason", "TEXT")                  # Por qué anuló
     ]:
         try:
             cursor.execute(f"ALTER TABLE transactions ADD COLUMN {col} {col_type}")
@@ -146,10 +192,16 @@ def init_db():
             producto_codigo TEXT,
             quantity INTEGER,
             unit_price REAL,
+            unidad_venta TEXT, -- Nueva columna: registra si fue Unidad, Docena, etc.
             FOREIGN KEY (transaction_id) REFERENCES transactions(id),
             FOREIGN KEY (producto_codigo) REFERENCES products(codigo)
         )
     ''')
+    
+    # Migración: Asegurar que la columna existe
+    try:
+        cursor.execute("ALTER TABLE transaction_details ADD COLUMN unidad_venta TEXT")
+    except sqlite3.OperationalError: pass
     
     # Tabla de Usuarios
     cursor.execute('''
@@ -165,8 +217,8 @@ def init_db():
     # Crear usuarios por defecto si no existen
     cursor.execute("SELECT COUNT(*) FROM users")
     if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO users (username, password, role) VALUES ('admin', 'admin123', 'admin')")
-        cursor.execute("INSERT INTO users (username, password, role) VALUES ('vendedor', 'vendedor123', 'seller')")
+        cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ('admin', hash_password('admin123'), 'admin'))
+        cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ('vendedor', hash_password('vendedor123'), 'seller'))
 
     # Añadir columna is_active a users si no existe
     try:
@@ -204,7 +256,7 @@ def init_db():
             user_id INTEGER NOT NULL,
             transaction_id INTEGER NOT NULL,
             commission_amount REAL NOT NULL,
-            date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            date TIMESTAMP ,
             FOREIGN KEY (user_id) REFERENCES users(id),
             FOREIGN KEY (transaction_id) REFERENCES transactions(id)
         )
@@ -218,9 +270,16 @@ def init_db():
             nombre TEXT,
             direccion TEXT,
             telefono TEXT,
-            email TEXT
+            email TEXT,
+            deleted_at TIMESTAMP DEFAULT NULL
         )
     ''')
+
+    # Asegurar que la columna deleted_at existe (migración)
+    try:
+        cursor.execute("ALTER TABLE customers ADD COLUMN deleted_at TIMESTAMP DEFAULT NULL")
+    except sqlite3.OperationalError:
+        pass
 
     # --- Permisos ---
     cursor.execute('''
@@ -238,6 +297,21 @@ def init_db():
             PRIMARY KEY (user_id, permission_id),
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Tabla de Movimientos de Caja (Ingresos/Retiros manuales)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS cash_movements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER,
+            user_id INTEGER,
+            tipo TEXT CHECK(tipo IN ('INGRESO', 'RETIRO')),
+            monto REAL NOT NULL,
+            descripcion TEXT,
+            fecha TIMESTAMP ,
+            FOREIGN KEY (session_id) REFERENCES cash_sessions(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
 
@@ -263,7 +337,8 @@ def init_db():
             ('cash.manage', 'Abrir y cerrar caja'),
             ('report.view.sales', 'Ver reporte de ventas'),
             ('report.view.cash', 'Ver reporte de caja'),
-            ('report.view.commissions', 'Ver reporte de comisiones')
+            ('report.view.commissions', 'Ver reporte de comisiones'),
+            ('sale.void', 'Anular ventas y recibos')
         ]
         cursor.executemany("INSERT INTO permissions (name, description) VALUES (?, ?)", all_permissions)
 
@@ -274,16 +349,147 @@ def init_db():
             user_perms_to_insert = [(admin_user['id'], perm_id['id']) for perm_id in permissions_ids]
             cursor.executemany("INSERT INTO user_permissions (user_id, permission_id) VALUES (?, ?)", user_perms_to_insert)
         
+    # Tabla de Unidades de Medida / Presentaciones por Producto
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS product_units (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            producto_codigo TEXT NOT NULL,
+            nombre_unidad TEXT NOT NULL,
+            factor_conversion REAL NOT NULL DEFAULT 1.0,
+            precio_venta REAL NOT NULL,
+            FOREIGN KEY (producto_codigo) REFERENCES products(codigo) ON DELETE CASCADE
+        )
+    ''')
+
+    # --- Configuración del Sistema ---
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS system_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    ''')
+    # Valor por defecto: 3 días de retención en papelera
+    cursor.execute("INSERT OR IGNORE INTO system_settings (key, value) VALUES ('trash_retention_days', '3')")
+
     conn.commit()
     conn.close()
+
+def get_setting(key, default=None):
+    """Obtiene un valor de configuración del sistema."""
+    conn = get_connection()
+    try:
+        res = conn.execute("SELECT value FROM system_settings WHERE key = ?", (key,)).fetchone()
+        return res['value'] if res else default
+    finally:
+        conn.close()
+
+def update_setting(key, value):
+    """Actualiza un valor de configuración."""
+    conn = get_connection()
+    try:
+        conn.execute("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)", (key, str(value)))
+        conn.commit()
+    finally:
+        conn.close()
+
+def get_report_sales_by_range_filtered(start_date, end_date, payment_method=None):
+    """Ventas detalladas por rango con filtrado opcional por método de pago."""
+    conn = get_connection()
+    query_resumen = """
+        SELECT 
+            SUM(t.total) as ingresos_brutos,
+            SUM(t.total / 1.18 * 0.18) as total_igv,
+            SUM(t.total / 1.18) as total_neto,
+            SUM((td.unit_price - p.precio_compra) * td.quantity) as ganancia_estimada
+        FROM transactions t
+        JOIN transaction_details td ON t.id = td.transaction_id
+        JOIN products p ON td.producto_codigo = p.codigo
+        WHERE date(t.date) BETWEEN date(?) AND date(?)
+          AND t.status != 'VOIDED'
+    """
+    params = [start_date, end_date]
+    if payment_method and payment_method != "TODOS":
+        query_resumen += " AND t.metodo_pago = ?"
+        params.append(payment_method)
+    
+    res = conn.execute(query_resumen, params).fetchone()
+    res_dict = dict(res) if res else {}
+
+    query_metodos = """
+        SELECT metodo_pago, SUM(total) as total
+        FROM transactions
+        WHERE (date(date) BETWEEN date(?) AND date(?))
+          AND status != 'VOIDED'
+    """
+    params_metodos = [start_date, end_date]
+    if payment_method and payment_method != "TODOS":
+        query_metodos += " AND metodo_pago = ?"
+        params_metodos.append(payment_method)
+    
+    query_metodos += " GROUP BY metodo_pago"
+    metodos = conn.execute(query_metodos, params_metodos).fetchall()
+    res_dict['por_metodo'] = {m['metodo_pago']: m['total'] for m in metodos}
+    conn.close()
+    return res_dict
+
+def get_report_sales_by_product_filtered(start_date, end_date, payment_method=None):
+    """Lista de productos vendidos con desglose por método de pago y rentabilidad."""
+    conn = get_connection()
+    query = """
+        SELECT 
+            p.nombre,
+            p.codigo,
+            SUM(td.quantity) as cant_vendida,
+            COALESCE(SUM(td.unit_price * td.quantity), 0.0) as total_generado,
+            COALESCE(SUM(CASE WHEN t.metodo_pago = 'EFECTIVO' THEN td.unit_price * td.quantity ELSE 0 END), 0.0) as efectivo,
+            COALESCE(SUM(CASE WHEN t.metodo_pago = 'TRANSFERENCIA' THEN td.unit_price * td.quantity ELSE 0 END), 0.0) as transferencia,
+            COALESCE(SUM(CASE WHEN t.metodo_pago = 'YAPE/PLIN' THEN td.unit_price * td.quantity ELSE 0 END), 0.0) as yape_plin,
+            COALESCE(SUM((td.unit_price - p.precio_compra) * td.quantity), 0.0) as margen_ganancia
+        FROM transaction_details td
+        JOIN products p ON td.producto_codigo = p.codigo
+        JOIN transactions t ON td.transaction_id = t.id
+        WHERE (date(t.date) BETWEEN date(?) AND date(?))
+          AND t.status != 'VOIDED'
+    """
+    params = [start_date, end_date]
+    if payment_method and payment_method != "TODOS":
+        query += " AND t.metodo_pago = ?"
+        params.append(payment_method)
+    
+    query += " GROUP BY p.codigo ORDER BY total_generado DESC"
+    res = conn.execute(query, params).fetchall()
+    conn.close()
+    return res
+
+def get_report_sales_by_customer(start_date, end_date):
+    """Obtiene el acumulado de compras por cada cliente en un rango de fechas."""
+    conn = get_connection()
+    query = """
+        SELECT 
+            cliente_nombre as nombre,
+            cliente_documento as documento,
+            COUNT(id) as num_compras,
+            SUM(total) as total_comprado,
+            MAX(date) as ultima_compra
+        FROM transactions
+        WHERE (date(date) BETWEEN date(?) AND date(?))
+          AND status != 'VOIDED'
+        GROUP BY cliente_documento
+        ORDER BY total_comprado DESC
+    """
+    res = conn.execute(query, (start_date, end_date)).fetchall()
+    conn.close()
+    return res
 
 # --- Funciones de Usuarios ---
 def authenticate_user(username, password):
     """Verifica si el usuario y la contraseña son correctos y si está activo.
-       Devuelve un diccionario con los datos del usuario, incluyendo un set de sus permisos.
+       Compara el hash de la contraseña proporcionada con el almacenado en la BD.
     """
     conn = get_connection()
-    user = conn.execute("SELECT id, username, role, is_active, is_discount_enabled, max_discount_percentage, commission_rate FROM users WHERE username = ? AND password = ? AND is_active = 1", (username, password)).fetchone()
+    # Encriptamos la contraseña ingresada para compararla con el código secreto de la BD
+    hashed = hash_password(password)
+    user = conn.execute("SELECT id, username, role, is_active, is_discount_enabled, max_discount_percentage, commission_rate FROM users WHERE username = ? AND password = ? AND is_active = 1", (username, hashed)).fetchone()
     
     if user:
         user_data = dict(user)
@@ -392,6 +598,92 @@ def delete_user(user_id):
     conn.commit()
     conn.close()
 
+def get_all_suppliers_full():
+    """Obtiene la lista completa de proveedores activos."""
+    conn = get_connection()
+    suppliers = conn.execute("SELECT * FROM suppliers WHERE deleted_at IS NULL ORDER BY nombre ASC").fetchall()
+    conn.close()
+    return suppliers
+
+def get_supplier_by_id(supplier_id):
+    """Obtiene un proveedor específico por su ID."""
+    conn = get_connection()
+    supplier = conn.execute("SELECT * FROM suppliers WHERE id = ?", (supplier_id,)).fetchone()
+    conn.close()
+    return supplier
+
+def update_supplier(supplier_id, data):
+    """Actualiza los datos de un proveedor existente."""
+    conn = get_connection()
+    try:
+        conn.execute("""
+            UPDATE suppliers 
+            SET nombre = ?, ruc_dni = ?, direccion = ?, telefono = ?, email = ?
+            WHERE id = ?
+        """, (
+            data['nombre'].upper(), 
+            data.get('ruc_dni'), 
+            data.get('direccion', '').upper(), 
+            data.get('telefono'), 
+            data.get('email', '').lower(),
+            supplier_id
+        ))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error al actualizar proveedor: {e}")
+        return False
+    finally:
+        conn.close()
+
+def delete_supplier(supplier_id):
+    """Realiza un borrado lógico (soft delete) del proveedor usando la configuración de días."""
+    conn = get_connection()
+    try:
+        # Verificar si tiene órdenes de compra activas
+        has_purchases = conn.execute("SELECT 1 FROM purchase_orders WHERE proveedor_id = ?", (supplier_id,)).fetchone()
+        if has_purchases:
+            raise ValueError("No se puede eliminar el proveedor porque tiene órdenes de compra registradas. Intente desactivarlo o déjelo en el sistema para mantener la integridad.")
+
+        now = get_lima_time()
+        days = get_setting('trash_retention_days', '3')
+        
+        conn.execute("UPDATE suppliers SET deleted_at = ? WHERE id = ?", (now, supplier_id))
+        conn.commit()
+        
+        # Limpieza automática basada en la configuración
+        conn.execute(f"DELETE FROM suppliers WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-{days} days')")
+        conn.commit()
+        return True
+    except Exception as e:
+        raise e
+    finally:
+        conn.close()
+
+def restore_supplier(supplier_id):
+    """Restaura un proveedor de la papelera."""
+    conn = get_connection()
+    try:
+        conn.execute("UPDATE suppliers SET deleted_at = NULL WHERE id = ?", (supplier_id,))
+        conn.commit()
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+def get_deleted_suppliers():
+    """Obtiene proveedores eliminados recientemente."""
+    conn = get_connection()
+    try:
+        query = "SELECT * FROM suppliers WHERE deleted_at IS NOT NULL AND deleted_at > datetime('now', '-3 days') ORDER BY deleted_at DESC"
+        res = conn.execute(query).fetchall()
+        conn.close()
+        return res
+    except Exception:
+        conn.close()
+        return []
+
 # --- Funciones de Caja y Ventas ---
 def get_active_session():
     """Obtiene la sesión de caja activa, si existe."""
@@ -401,19 +693,25 @@ def get_active_session():
     return session
 
 def open_cash_session(initial_fund, user_id):
-    """Inicia una nueva sesión de caja."""
+    """Inicia una nueva sesión de caja usando la hora local."""
     conn = get_connection()
-    conn.execute("INSERT INTO cash_sessions (initial_fund, status, opened_by_user_id) VALUES (?, 'OPEN', ?)", (initial_fund, user_id))
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    conn.execute("INSERT INTO cash_sessions (open_date, initial_fund, status, opened_by_user_id) VALUES (?, ?, 'OPEN', ?)", (now, initial_fund, user_id))
     conn.commit()
     conn.close()
 
 def close_cash_session(session_id, total_sales, user_id):
-    """Cierra la sesión de caja activa."""
+    """Cierra la sesión de caja activa usando la hora local y genera un respaldo."""
     conn = get_connection()
-    conn.execute("UPDATE cash_sessions SET close_date = CURRENT_TIMESTAMP, total_sales = ?, status = 'CLOSED', closed_by_user_id = ? WHERE id = ?",
-                   (total_sales, user_id, session_id))
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    conn.execute("UPDATE cash_sessions SET close_date = ?, total_sales = ?, status = 'CLOSED', closed_by_user_id = ? WHERE id = ?",
+                   (now, total_sales, user_id, session_id))
     conn.commit()
     conn.close()
+    
+    # DISPARAR RESPALDO AUTOMÁTICO AL CERRAR CAJA
+    print("Iniciando respaldo automático por cierre de caja...")
+    run_backup_professional()
 
 def get_sales_for_session(session_id):
     """Calcula el total de ventas para una sesión."""
@@ -447,7 +745,7 @@ def get_purchase_order_details(order_id):
     """Obtiene los detalles (productos) de una orden de compra específica."""
     conn = get_connection()
     details = conn.execute("""
-        SELECT pod.*, p.nombre, p.unidad
+        SELECT pod.*, p.nombre, p.unidad, p.descripcion
         FROM purchase_order_details pod
         JOIN products p ON pod.producto_codigo = p.codigo
         WHERE pod.pedido_id = ?
@@ -495,13 +793,16 @@ def create_purchase_order(proveedor_nombre, ruc_dni, items, po_data=None):
         po_data = po_data or {}
         numero_oc = generar_nuevo_numero_oc()
         
+        # Usar fecha proporcionada o la actual
+        fecha_compra = po_data.get('fecha_compra') or get_lima_time()
+        
         cursor.execute('''
             INSERT INTO purchase_orders (
-                proveedor_id, numero_oc, estado, fecha_estimada, condicion_pago, 
+                proveedor_id, numero_oc, estado, fecha_pedido, fecha_estimada, condicion_pago, 
                 lugar_entrega, responsable_recibe, subtotal, igv, total
-            ) VALUES (?, ?, 'PENDIENTE', ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, 'PENDIENTE', ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            proveedor_id, numero_oc,
+            proveedor_id, numero_oc, fecha_compra,
             po_data.get('fecha_estimada'), 
             po_data.get('condicion_pago'), 
             po_data.get('lugar_entrega'),
@@ -555,18 +856,43 @@ def update_purchase_order_status(order_id, new_status):
         conn.close()
 
 def receive_purchase_order(order_id):
-    """Marca una orden como 'RECIBIDO' y actualiza el stock de los productos."""
+    """Marca una orden como 'RECIBIDO', actualiza stock_actual y calcula el costo promedio."""
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        # 1. Obtener todos los productos de la orden
-        details = conn.execute("SELECT producto_codigo, cantidad FROM purchase_order_details WHERE pedido_id = ?", (order_id,)).fetchall()
+        # 1. Obtener productos de la orden
+        details = cursor.execute("SELECT producto_codigo, cantidad, precio_compra_unitario FROM purchase_order_details WHERE pedido_id = ?", (order_id,)).fetchall()
         
-        # 2. Actualizar el stock para cada producto
         for item in details:
-            cursor.execute("UPDATE products SET stock = stock + ? WHERE codigo = ?", (item['cantidad'], item['producto_codigo']))
+            sku = item['producto_codigo']
+            cant_nueva = item['cantidad']
+            precio_nuevo = item['precio_compra_unitario']
+            
+            # Obtener stock y costo actual
+            prod = cursor.execute("SELECT stock_actual, costo_promedio FROM products WHERE codigo = ?", (sku,)).fetchone()
+            
+            if prod:
+                stock_ant = prod['stock_actual'] or 0
+                costo_ant = prod['costo_promedio'] or 0.0
+                
+                # Cálculo de Costo Promedio Ponderado
+                stock_total = stock_ant + cant_nueva
+                if stock_total > 0:
+                    nuevo_costo_prom = ((stock_ant * costo_ant) + (cant_nueva * precio_nuevo)) / stock_total
+                else:
+                    nuevo_costo_prom = precio_nuevo
+                
+                # Actualizar producto
+                cursor.execute("""
+                    UPDATE products 
+                    SET stock_actual = stock_actual + ?, 
+                        stock = stock + ?,
+                        precio_compra = ?, 
+                        costo_promedio = ? 
+                    WHERE codigo = ?
+                """, (cant_nueva, cant_nueva, precio_nuevo, nuevo_costo_prom, sku))
 
-        # 3. Marcar la orden como recibida y registrar la fecha de llegada
+        # 2. Marcar orden como recibida
         cursor.execute("UPDATE purchase_orders SET estado = 'RECIBIDO', fecha_llegada = CURRENT_TIMESTAMP WHERE id = ?", (order_id,))
         
         conn.commit()
@@ -589,23 +915,42 @@ def generar_correlativo_comprobante(tipo):
     return f"{prefijo}-{(count + 1):06d}"
 
 def record_sale(session_id, total, cart_items, user_id, payment_data=None):
-    """Registra una venta con datos del cliente, métodos de pago y comprobante."""
+    """Registra una venta con validación de stock y existencia de productos."""
+    now = get_lima_time()
     payment_data = payment_data or {}
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        # Generar correlativo si es necesario
+        # 1. Validar Stock y Existencia de Productos antes de cualquier cambio
         tipo_comp = payment_data.get('tipo_comprobante', 'TICKET').upper()
+        
+        if tipo_comp != "PROFORMA":
+            for item in cart_items:
+                # item puede ser (codigo, cantidad, precio) o (codigo, cantidad, precio, factor)
+                codigo = item[0]
+                cantidad = item[1]
+                factor = item[3] if len(item) > 3 else 1.0
+                cantidad_total = cantidad * factor
+                
+                prod = cursor.execute("SELECT nombre, stock_actual FROM products WHERE codigo = ?", (codigo,)).fetchone()
+                
+                if not prod:
+                    raise ValueError(f"El producto con código '{codigo}' no existe.")
+                
+                if prod['stock_actual'] < cantidad_total:
+                    raise ValueError(f"Stock insuficiente para '{prod['nombre']}'. Disponible: {prod['stock_actual']}, Requerido: {cantidad_total}")
+
+        # 2. Generar correlativo
         correlativo = generar_correlativo_comprobante(tipo_comp)
 
-        # 1. Registrar la transacción con datos del cliente
+        # 3. Registrar la transacción con datos del cliente
         cursor.execute("""
-            INSERT INTO transactions (
+            INSERT INTO transactions (date, 
                 session_id, total, user_id, metodo_pago, tipo_comprobante, 
                 correlativo, monto_pagado, vuelto, cliente_nombre, cliente_documento
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            session_id, total, user_id, 
+            now, session_id, total, user_id, 
             payment_data.get('metodo_pago', 'EFECTIVO'),
             tipo_comp, correlativo,
             payment_data.get('monto_pagado', total),
@@ -615,16 +960,28 @@ def record_sale(session_id, total, cart_items, user_id, payment_data=None):
         ))
         transaction_id = cursor.lastrowid
         
-        # 2. Detalles y Stock
+        # 4. Detalles y Actualización de Stock
         for item in cart_items:
-            # item = (producto_codigo, quantity, unit_price)
-            cursor.execute("INSERT INTO transaction_details (transaction_id, producto_codigo, quantity, unit_price) VALUES (?, ?, ?, ?)", (transaction_id, item[0], item[1], item[2]))
-            cursor.execute("UPDATE products SET stock = stock - ? WHERE codigo = ?", (item[1], item[0]))
+            # item = (producto_codigo, quantity, unit_price, factor, unidad_nombre)
+            # Nota: Si el factor no viene en la tupla, por defecto es 1.0
+            factor = item[3] if len(item) > 3 else 1.0
+            u_nombre = item[4] if len(item) > 4 else None
+            cantidad_base = item[1] * factor
+            
+            cursor.execute("""
+                INSERT INTO transaction_details (transaction_id, producto_codigo, quantity, unit_price, unidad_venta) 
+                VALUES (?, ?, ?, ?, ?)
+            """, (transaction_id, item[0], item[1], item[2], u_nombre))
+            
+            # SOLO DESCONTAR STOCK SI NO ES PROFORMA
+            if tipo_comp != "PROFORMA":
+                cursor.execute("UPDATE products SET stock = stock - ?, stock_actual = stock_actual - ? WHERE codigo = ?", (cantidad_base, cantidad_base, item[0]))
 
-        # 3. Comisiones
-        seller = get_user_by_id(user_id)
-        if seller and seller['commission_rate'] > 0:
-            cursor.execute("INSERT INTO commissions_earned (user_id, transaction_id, commission_amount) VALUES (?, ?, ?)", (user_id, transaction_id, total * seller['commission_rate']))
+        # 5. Comisiones (Solo si no es proforma)
+        if tipo_comp != "PROFORMA":
+            seller = cursor.execute("SELECT commission_rate FROM users WHERE id = ?", (user_id,)).fetchone()
+            if seller and seller['commission_rate'] > 0:
+                cursor.execute("INSERT INTO commissions_earned (user_id, transaction_id, commission_amount) VALUES (?, ?, ?)", (user_id, transaction_id, total * seller['commission_rate']))
             
         conn.commit()
         return transaction_id, correlativo
@@ -675,6 +1032,7 @@ def get_sales_history(user_id=None, start_date=None, end_date=None):
             t.id AS transaction_id,
             t.date AS transaction_date,
             t.total AS transaction_total,
+            t.status,
             u.username AS seller_name
         FROM transactions t
         JOIN users u ON t.user_id = u.id
@@ -696,6 +1054,57 @@ def get_sales_history(user_id=None, start_date=None, end_date=None):
     sales = conn.execute(query, params).fetchall()
     conn.close()
     return sales
+
+def add_cash_movement(session_id, user_id, tipo, monto, descripcion):
+    """Registra un ingreso o retiro manual de efectivo."""
+    conn = get_connection()
+    conn.execute("INSERT INTO cash_movements (session_id, user_id, tipo, monto, descripcion) VALUES (?, ?, ?, ?, ?)",
+                   (session_id, user_id, tipo, monto, descripcion))
+    conn.commit()
+    conn.close()
+
+def get_cash_session_summary(session_id):
+    """Obtiene un resumen completo de la sesión actual (Corte X)."""
+    conn = get_connection()
+    
+    # 1. Ventas por método de pago
+    sales = conn.execute("""
+        SELECT metodo_pago, SUM(total) as total 
+        FROM transactions 
+        WHERE session_id = ? 
+          AND status != 'VOIDED'
+        GROUP BY metodo_pago
+    """, (session_id,)).fetchall()
+    
+    # 2. Movimientos manuales
+    movements = conn.execute("""
+        SELECT tipo, SUM(monto) as total 
+        FROM cash_movements 
+        WHERE session_id = ? 
+        GROUP BY tipo
+    """, (session_id,)).fetchall()
+    
+    # 3. Datos de la sesión (Fondo inicial)
+    session = conn.execute("SELECT initial_fund FROM cash_sessions WHERE id = ?", (session_id,)).fetchone()
+    
+    conn.close()
+    
+    # Organizar resultados
+    res = {
+        'ventas': {r['metodo_pago']: r['total'] for r in sales},
+        'movimientos': {r['tipo']: r['total'] for r in movements},
+        'inicial': session['initial_fund'] if session else 0.0
+    }
+    
+    # Calcular Efectivo Real esperado
+    efectivo_ventas = res['ventas'].get('EFECTIVO', 0.0)
+    ingresos = res['movimientos'].get('INGRESO', 0.0)
+    retiros = res['movimientos'].get('RETIRO', 0.0)
+    
+    res['efectivo_esperado'] = res['inicial'] + efectivo_ventas + ingresos - retiros
+    res['total_general'] = sum(res['ventas'].values()) + ingresos - retiros
+    
+    return res
 
 def get_cash_sessions_history(user_id=None, start_date=None, end_date=None):
     """Obtiene el historial de sesiones de caja, opcionalmente filtrado por usuario y rango de fechas."""
@@ -742,26 +1151,27 @@ def get_report_daily_sales():
     """Obtiene el resumen de ventas del día actual por método de pago."""
     conn = get_connection()
     # Fecha de hoy en formato YYYY-MM-DD
-    hoy = datetime.now().strftime('%Y-%m-%d')
+    hoy = get_lima_time()[:10]
     
     query = """
         SELECT 
             COUNT(id) as total_transacciones,
             SUM(total) as monto_total,
             SUM(CASE WHEN metodo_pago = 'EFECTIVO' THEN total ELSE 0 END) as efectivo,
-            SUM(CASE WHEN metodo_pago = 'TARJETA' THEN total ELSE 0 END) as tarjeta,
-            SUM(CASE WHEN metodo_pago NOT IN ('EFECTIVO', 'TARJETA') THEN total ELSE 0 END) as otros
+            SUM(CASE WHEN metodo_pago = 'TRANSFERENCIA' THEN total ELSE 0 END) as transferencia,
+            SUM(CASE WHEN metodo_pago NOT IN ('EFECTIVO', 'TRANSFERENCIA') THEN total ELSE 0 END) as otros
         FROM transactions 
-        WHERE date(date) = ?
+        WHERE date(date) = date(?)
+          AND status != 'VOIDED'
     """
     res = conn.execute(query, (hoy,)).fetchone()
     conn.close()
     return res
 
 def get_report_sales_by_range(start_date, end_date):
-    """Ventas detalladas por rango con cálculo de utilidad/ganancia."""
+    """Ventas detalladas por rango con cálculo de utilidad/ganancia y desglose por método."""
     conn = get_connection()
-    query = """
+    query_resumen = """
         SELECT 
             SUM(t.total) as ingresos_brutos,
             SUM(t.total / 1.18 * 0.18) as total_igv,
@@ -770,39 +1180,85 @@ def get_report_sales_by_range(start_date, end_date):
         FROM transactions t
         JOIN transaction_details td ON t.id = td.transaction_id
         JOIN products p ON td.producto_codigo = p.codigo
-        WHERE date(t.date) BETWEEN ? AND ?
+        WHERE date(t.date) BETWEEN date(?) AND date(?)
+          AND t.status != 'VOIDED'
     """
-    res = conn.execute(query, (start_date, end_date)).fetchone()
-    conn.close()
-    return res
+    res = conn.execute(query_resumen, (start_date, end_date)).fetchone()
+    res_dict = dict(res) if res else {}
 
-def get_report_sales_by_product(start_date, end_date):
-    """Lista de productos vendidos con su rentabilidad en un periodo."""
+    query_metodos = """
+        SELECT metodo_pago, SUM(total) as total
+        FROM transactions
+        WHERE (date(date) BETWEEN ? AND ?)
+          AND status != 'VOIDED'
+        GROUP BY metodo_pago
+    """
+    metodos = conn.execute(query_metodos, (start_date, end_date)).fetchall()
+    res_dict['por_metodo'] = {m['metodo_pago']: m['total'] for m in metodos}
+    conn.close()
+    return res_dict
+
+def get_report_sales_by_category(start_date, end_date, payment_method=None):
+    """Obtiene el resumen de ventas agrupado por categorías con desglose de pagos."""
     conn = get_connection()
     query = """
         SELECT 
-            p.nombre,
+            COALESCE(p.categoria, 'SIN CATEGORÍA') as categoria,
             SUM(td.quantity) as cant_vendida,
+            COALESCE(SUM(CASE WHEN t.metodo_pago = 'EFECTIVO' THEN td.unit_price * td.quantity ELSE 0 END), 0.0) as efectivo,
+            COALESCE(SUM(CASE WHEN t.metodo_pago = 'TRANSFERENCIA' OR t.metodo_pago = 'TARJETA' THEN td.unit_price * td.quantity ELSE 0 END), 0.0) as transferencia,
+            COALESCE(SUM(CASE WHEN t.metodo_pago = 'YAPE/PLIN' THEN td.unit_price * td.quantity ELSE 0 END), 0.0) as yape_plin,
             SUM(td.unit_price * td.quantity) as total_generado,
             SUM((td.unit_price - p.precio_compra) * td.quantity) as margen_ganancia
         FROM transaction_details td
         JOIN products p ON td.producto_codigo = p.codigo
         JOIN transactions t ON td.transaction_id = t.id
-        WHERE date(t.date) BETWEEN ? AND ?
-        GROUP BY p.codigo
-        ORDER BY total_generado DESC
+        WHERE (date(t.date) BETWEEN date(?) AND date(?))
+          AND t.status != 'VOIDED'
     """
-    res = conn.execute(query, (start_date, end_date)).fetchall()
+    params = [start_date, end_date]
+    if payment_method and payment_method != "TODOS":
+        query += " AND t.metodo_pago = ?"
+        params.append(payment_method)
+    
+    query += " GROUP BY categoria ORDER BY total_generado DESC"
+    res = conn.execute(query, params).fetchall()
+    conn.close()
+    return res
+
+def get_report_sales_by_category_details(category, start_date, end_date):
+    """Obtiene el detalle de productos vendidos dentro de una categoría específica."""
+    conn = get_connection()
+    query = """
+        SELECT 
+            p.codigo,
+            p.nombre,
+            SUM(td.quantity) as cant_vendida,
+            SUM(td.unit_price * td.quantity) as total_generado,
+            t.metodo_pago,
+            t.date
+        FROM transaction_details td
+        JOIN products p ON td.producto_codigo = p.codigo
+        JOIN transactions t ON td.transaction_id = t.id
+        WHERE COALESCE(p.categoria, 'SIN CATEGORÍA') = ?
+          AND (date(t.date) BETWEEN date(?) AND date(?))
+          AND t.status != 'VOIDED'
+        GROUP BY p.codigo, t.metodo_pago
+        ORDER BY t.date DESC
+    """
+    res = conn.execute(query, (category, start_date, end_date)).fetchall()
     conn.close()
     return res
 
 def get_report_top_products(limit=10):
-    """Obtiene los 10 productos más vendidos por cantidad."""
+    """Obtiene los 10 productos más vendidos por cantidad (Excluye anuladas)."""
     conn = get_connection()
     query = """
         SELECT p.nombre, SUM(td.quantity) as total_qty
         FROM transaction_details td
         JOIN products p ON td.producto_codigo = p.codigo
+        JOIN transactions t ON td.transaction_id = t.id
+        WHERE t.status != 'VOIDED'
         GROUP BY p.codigo
         ORDER BY total_qty DESC
         LIMIT ?
@@ -825,12 +1281,13 @@ def get_report_low_stock():
     return res
 
 def get_report_kardex():
-    """Reporte de movimientos consolidado con ID de referencia."""
+    """Reporte de movimientos consolidado con ID de referencia (Excluye ventas anuladas)."""
     conn = get_connection()
     query = """
         SELECT t.id as ref_id, t.date, 'SALIDA (VENTA)' as tipo, td.producto_codigo, td.quantity as cant, td.unit_price as precio
         FROM transaction_details td
         JOIN transactions t ON td.transaction_id = t.id
+        WHERE t.status != 'VOIDED'
         
         UNION ALL
         
@@ -845,25 +1302,41 @@ def get_report_kardex():
     return res
 
 def buscar_cliente_local(documento):
-    """Busca un cliente en la tabla dedicada de clientes."""
+    """Busca un cliente en la tabla dedicada de clientes devolviendo todos sus campos."""
     conn = get_connection()
     try:
-        res = conn.execute("SELECT nombre, direccion, telefono, email FROM customers WHERE documento = ?", (documento,)).fetchone()
+        # Ahora incluimos id y documento en la consulta
+        res = conn.execute("SELECT id, documento, nombre, direccion, telefono, email FROM customers WHERE documento = ?", (documento,)).fetchone()
         conn.close()
         return dict(res) if res else None
-    except Exception:
+    except Exception as e:
+        print(f"Error al buscar cliente: {e}")
         conn.close()
         return None
 
 def get_all_customers(search_term=""):
-    """Devuelve la lista de clientes, opcionalmente filtrada."""
+    """Devuelve la lista de clientes activos, opcionalmente filtrada."""
     conn = get_connection()
     try:
+        # Solo clientes donde deleted_at sea NULL
         if search_term:
-            query = "SELECT * FROM customers WHERE nombre LIKE ? OR documento LIKE ? ORDER BY nombre ASC"
+            query = "SELECT * FROM customers WHERE deleted_at IS NULL AND (nombre LIKE ? OR documento LIKE ?) ORDER BY nombre ASC"
             res = conn.execute(query, (f"%{search_term}%", f"%{search_term}%")).fetchall()
         else:
-            res = conn.execute("SELECT * FROM customers ORDER BY nombre ASC").fetchall()
+            res = conn.execute("SELECT * FROM customers WHERE deleted_at IS NULL ORDER BY nombre ASC").fetchall()
+        conn.close()
+        return res
+    except Exception:
+        conn.close()
+        return []
+
+def get_deleted_customers():
+    """Obtiene clientes eliminados en los últimos 3 días."""
+    conn = get_connection()
+    try:
+        # Clientes eliminados hace menos de 3 días
+        query = "SELECT * FROM customers WHERE deleted_at IS NOT NULL AND deleted_at > datetime('now', '-3 days') ORDER BY deleted_at DESC"
+        res = conn.execute(query).fetchall()
         conn.close()
         return res
     except Exception:
@@ -871,10 +1344,27 @@ def get_all_customers(search_term=""):
         return []
 
 def delete_customer(documento):
-    """Elimina un cliente de la base de datos."""
+    """Realiza una eliminación temporal (Soft Delete) del cliente."""
     conn = get_connection()
     try:
-        conn.execute("DELETE FROM customers WHERE documento = ?", (documento,))
+        now = get_lima_time()
+        conn.execute("UPDATE customers SET deleted_at = ? WHERE documento = ?", (now, documento))
+        conn.commit()
+        
+        # Limpieza automática de clientes eliminados hace más de 3 días
+        conn.execute("DELETE FROM customers WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-3 days')")
+        conn.commit()
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+def restore_customer(documento):
+    """Restaura un cliente de la papelera."""
+    conn = get_connection()
+    try:
+        conn.execute("UPDATE customers SET deleted_at = NULL WHERE documento = ?", (documento,))
         conn.commit()
         return True
     except Exception:
@@ -883,10 +1373,31 @@ def delete_customer(documento):
         conn.close()
 
 def add_or_update_customer(data):
-    """Guarda o actualiza la información completa de un cliente."""
+    """Guarda o actualiza la información completa de un cliente usando ID o Documento."""
     conn = get_connection()
     cursor = conn.cursor()
     try:
+        # 1. Si viene un ID, intentamos actualizar ese registro específico
+        client_id = data.get('id')
+        if client_id:
+            cursor.execute('''
+                UPDATE customers 
+                SET documento = ?, nombre = ?, direccion = ?, telefono = ?, email = ?
+                WHERE id = ?
+            ''', (
+                str(data['documento']), 
+                str(data['nombre']).upper(), 
+                str(data.get('direccion') or '').upper(), 
+                str(data.get('telefono') or ''), 
+                str(data.get('email') or '').lower(),
+                client_id
+            ))
+            # Si no se actualizó nada (ID no existe), procedemos al INSERT
+            if cursor.rowcount > 0:
+                conn.commit()
+                return True
+
+        # 2. Si no hay ID o la actualización falló, usamos el comportamiento anterior (INSERT or UPDATE por documento)
         cursor.execute('''
             INSERT INTO customers (documento, nombre, direccion, telefono, email)
             VALUES (?, ?, ?, ?, ?)
@@ -903,8 +1414,13 @@ def add_or_update_customer(data):
             str(data.get('email') or '').lower()
         ))
         conn.commit()
+        return True
+    except sqlite3.IntegrityError as ie:
+        print(f"Error de integridad al guardar cliente: {ie}")
+        raise ValueError("El DNI/RUC ya pertenece a otro cliente.")
     except Exception as e:
-        print(f"Error al guardar cliente: {e}")
+        print(f"Error general al guardar cliente: {e}")
+        return False
     finally:
         conn.close()
 
@@ -919,7 +1435,8 @@ def get_sale_full_details(transaction_id):
     
     # 2. Detalles de productos
     items = conn.execute("""
-        SELECT p.codigo, p.nombre, td.quantity, td.unit_price, p.fabricante, p.unidad, p.stock
+        SELECT p.codigo, p.nombre, td.quantity, td.unit_price, p.fabricante, 
+               COALESCE(td.unidad_venta, p.unidad) as unidad_venta, p.stock
         FROM transaction_details td
         JOIN products p ON td.producto_codigo = p.codigo
         WHERE td.transaction_id = ?
@@ -936,7 +1453,7 @@ def update_sale(transaction_id, total, cart_items, payment_data):
         # 1. REVERTIR STOCK ANTERIOR
         old_items = cursor.execute("SELECT producto_codigo, quantity FROM transaction_details WHERE transaction_id = ?", (transaction_id,)).fetchall()
         for item in old_items:
-            cursor.execute("UPDATE products SET stock = stock + ? WHERE codigo = ?", (item['quantity'], item['producto_codigo']))
+            cursor.execute("UPDATE products SET stock = stock + ?, stock_actual = stock_actual + ? WHERE codigo = ?", (item['quantity'], item['quantity'], item['producto_codigo']))
         
         # 2. LIMPIAR DETALLES ANTERIORES
         cursor.execute("DELETE FROM transaction_details WHERE transaction_id = ?", (transaction_id,))
@@ -958,7 +1475,7 @@ def update_sale(transaction_id, total, cart_items, payment_data):
         for item in cart_items:
             # item = (producto_codigo, quantity, unit_price)
             cursor.execute("INSERT INTO transaction_details (transaction_id, producto_codigo, quantity, unit_price) VALUES (?, ?, ?, ?)", (transaction_id, item[0], item[1], item[2]))
-            cursor.execute("UPDATE products SET stock = stock - ? WHERE codigo = ?", (item[1], item[0]))
+            cursor.execute("UPDATE products SET stock = stock - ?, stock_actual = stock_actual - ? WHERE codigo = ?", (item[1], item[1], item[0]))
 
         conn.commit()
         return True
@@ -987,7 +1504,7 @@ def get_product(codigo):
     conn = get_connection()
     # Unir con la tabla de proveedores para obtener el nombre en lugar de solo el ID
     product = conn.execute("""
-        SELECT p.*, s.nombre as proveedor_nombre 
+        SELECT p.codigo as id, p.codigo as sku, p.*, s.nombre as proveedor_nombre 
         FROM products p 
         LEFT JOIN suppliers s ON p.proveedor_id = s.id 
         WHERE p.codigo = ?
@@ -999,7 +1516,7 @@ def get_product_by_name(nombre):
     """Obtiene un producto específico por su nombre exacto."""
     conn = get_connection()
     product = conn.execute("""
-        SELECT p.*, s.nombre as proveedor_nombre 
+        SELECT p.codigo as id, p.codigo as sku, p.*, s.nombre as proveedor_nombre 
         FROM products p 
         LEFT JOIN suppliers s ON p.proveedor_id = s.id 
         WHERE p.nombre = ?
@@ -1008,55 +1525,193 @@ def get_product_by_name(nombre):
     return product
 
 def delete_product(codigo):
-    """Elimina un producto de la base de datos."""
+    """Realiza un borrado lógico (soft delete) del producto."""
     conn = get_connection()
-    conn.execute("DELETE FROM products WHERE codigo = ?", (codigo,))
-    conn.commit()
+    try:
+        now = get_lima_time()
+        conn.execute("UPDATE products SET deleted_at = ? WHERE codigo = ?", (now, codigo))
+        conn.commit()
+        
+        # Limpieza automática de productos eliminados hace más de 3 días
+        conn.execute("DELETE FROM products WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-3 days')")
+        conn.commit()
+        return True
+    except Exception as e:
+        raise e
+    finally:
+        conn.close()
+
+def restore_product(codigo):
+    """Restaura un producto de la papelera."""
+    conn = get_connection()
+    try:
+        conn.execute("UPDATE products SET deleted_at = NULL WHERE codigo = ?", (codigo,))
+        conn.commit()
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+def get_deleted_products():
+    """Obtiene productos eliminados en los últimos 3 días."""
+    conn = get_connection()
+    try:
+        query = "SELECT * FROM products WHERE deleted_at IS NOT NULL AND deleted_at > datetime('now', '-3 days') ORDER BY deleted_at DESC"
+        res = conn.execute(query).fetchall()
+        conn.close()
+        return res
+    except Exception:
+        conn.close()
+        return []
+
+def get_next_product_code():
+    """Genera el siguiente código SKU disponible con el formato R_XXXX."""
+    conn = get_connection()
+    # Buscamos códigos que empiecen con R_ y tengan números
+    cursor = conn.execute("SELECT codigo FROM products WHERE codigo LIKE 'R_%'")
+    codes = cursor.fetchall()
     conn.close()
+    
+    max_num = 0
+    for row in codes:
+        codigo = row['codigo']
+        # Extraer la parte numérica si es posible
+        parts = codigo.split('_')
+        if len(parts) >= 2:
+            num_part = parts[1]
+            # Si tiene letras al final (ej: R_mad01), intentamos extraer el prefijo numérico o solo números
+            # Pero basándonos en R_0950, el formato es R_XXXX
+            import re
+            match = re.search(r'(\d+)', num_part)
+            if match:
+                num = int(match.group(1))
+                if num > max_num:
+                    max_num = num
+    
+    # Retornamos el siguiente con formato R_XXXX (rellenando con ceros a la izquierda)
+    # Si max_num es 0 (no hay códigos R_ o todos son inválidos), empezamos en 0001
+    return f"R_{str(max_num + 1).zfill(4)}"
+
+def get_unit_factor(unidad_nombre):
+    """Retorna el factor numérico de una unidad por su nombre."""
+    if not unidad_nombre: return 1.0
+    u = unidad_nombre.lower().strip()
+    if 'millar' in u: return 1000.0
+    if 'medio millar' in u: return 500.0
+    if 'ciento' in u: return 100.0
+    if 'medio ciento' in u: return 50.0
+    if 'docena' in u: return 12.0
+    return 1.0
 
 def add_or_update_product(product_data):
-    """Añade o actualiza un producto en la base de datos desde el formulario de la UI."""
+    """Añade o actualiza un producto, guardando el stock en unidades físicas directas."""
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Gestionar el proveedor
-    proveedor_id = None
-    proveedor_nombre = _clean_value(product_data.get('proveedor_nombre'))
-    if proveedor_nombre:
-        cursor.execute("SELECT id FROM suppliers WHERE nombre = ?", (proveedor_nombre,))
-        supplier_row = cursor.fetchone()
-        if supplier_row:
-            proveedor_id = supplier_row['id']
-        else:
-            cursor.execute("INSERT INTO suppliers (nombre) VALUES (?)", (proveedor_nombre,))
-            proveedor_id = cursor.lastrowid
+    codigo = _clean_value(product_data.get('codigo'))
+    unidad = _clean_value(product_data.get('unidad'))
     
-    fecha_ingreso = product_data.get('fecha_ingreso') or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # El stock se guarda tal cual lo ingresa el usuario (en piezas sueltas)
+    stock_real = _clean_value(product_data.get('stock_actual') or product_data.get('stock'), 'float')
+    
+    nuevo_precio_venta = _clean_value(product_data.get('precio_venta'), 'float')
+    
+    # 1. Verificar si existe
+    cursor.execute("SELECT precio_venta, fecha_actualizacion_precio FROM products WHERE codigo = ?", (codigo,))
+    row = cursor.fetchone()
+    
+    exists = row is not None
+    fecha_precio = None
+    if exists:
+        precio_actual = row['precio_venta']
+        fecha_precio = row['fecha_actualizacion_precio']
+        if precio_actual != nuevo_precio_venta or not fecha_precio:
+            fecha_precio = get_lima_time()
+    else:
+        fecha_precio = get_lima_time()
 
-    params = (
-        _clean_value(product_data.get('codigo')), 
-        _clean_value(product_data.get('nombre')), 
-        _clean_value(product_data.get('fabricante')),
-        _clean_value(product_data.get('categoria')), 
-        _clean_value(product_data.get('descripcion')),
-        _clean_value(product_data.get('precio_venta'), 'float'), 
-        _clean_value(product_data.get('precio_compra'), 'float'),
-        _clean_value(product_data.get('unidad')), 
-        _clean_value(product_data.get('stock'), 'int'),
-        _clean_value(product_data.get('stock_minimo'), 'int') or 5, 
-        proveedor_id, 
-        fecha_ingreso
-    )
+    # 2. Gestionar Proveedor
+    proveedor_id = product_data.get('proveedor_id')
+    if not proveedor_id:
+        proveedor_nombre = _clean_value(product_data.get('proveedor_nombre'))
+        if proveedor_nombre:
+            cursor.execute("SELECT id FROM suppliers WHERE nombre = ?", (proveedor_nombre,))
+            supplier_row = cursor.fetchone()
+            if supplier_row:
+                proveedor_id = supplier_row['id']
+            else:
+                cursor.execute("INSERT INTO suppliers (nombre) VALUES (?)", (proveedor_nombre,))
+                proveedor_id = cursor.lastrowid
     
-    cursor.execute('''
-        INSERT OR REPLACE INTO products (
-            codigo, nombre, fabricante, categoria, descripcion, precio_venta, 
-            precio_compra, unidad, stock, stock_minimo, proveedor_id, fecha_ingreso
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', params)
+    if exists:
+        # ACTUALIZACIÓN (Usamos UPDATE para proteger las llaves foráneas ON DELETE CASCADE)
+        cursor.execute('''
+            UPDATE products SET 
+                nombre=?, fabricante=?, categoria=?, descripcion=?, precio_venta=?, 
+                precio_compra=?, unidad=?, stock=?, stock_actual=?, stock_minimo=?, 
+                proveedor_id=?, fecha_actualizacion_precio=?
+            WHERE codigo=?
+        ''', (
+            _clean_value(product_data.get('nombre')), 
+            _clean_value(product_data.get('fabricante')),
+            _clean_value(product_data.get('categoria')), 
+            _clean_value(product_data.get('descripcion')),
+            nuevo_precio_venta, 
+            _clean_value(product_data.get('precio_compra'), 'float'),
+            unidad, 
+            stock_real,
+            stock_real,
+            _clean_value(product_data.get('stock_minimo'), 'int') or 5, 
+            proveedor_id, 
+            fecha_precio,
+            codigo
+        ))
+    else:
+        # INSERCIÓN
+        fecha_ingreso = product_data.get('fecha_ingreso') or get_lima_time()
+        cursor.execute('''
+            INSERT INTO products (
+                codigo, nombre, fabricante, categoria, descripcion, precio_venta, 
+                precio_compra, unidad, stock, stock_actual, stock_minimo, proveedor_id, 
+                fecha_ingreso, fecha_actualizacion_precio
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            codigo, 
+            _clean_value(product_data.get('nombre')), 
+            _clean_value(product_data.get('fabricante')),
+            _clean_value(product_data.get('categoria')), 
+            _clean_value(product_data.get('descripcion')),
+            nuevo_precio_venta, 
+            _clean_value(product_data.get('precio_compra'), 'float'),
+            unidad, 
+            stock_real,
+            stock_real,
+            _clean_value(product_data.get('stock_minimo'), 'int') or 5, 
+            proveedor_id, 
+            fecha_ingreso,
+            fecha_precio
+        ))
     
     conn.commit()
     conn.close()
+
+def get_similar_products(nombre, limit=5):
+    """Busca productos con nombres similares para evitar duplicados."""
+    if not nombre or len(nombre) < 3:
+        return []
+    conn = get_connection()
+    # Usamos LIKE con comodines para buscar coincidencias parciales
+    query = """
+        SELECT codigo, nombre, precio_venta, stock_actual 
+        FROM products 
+        WHERE nombre LIKE ? 
+        ORDER BY nombre ASC 
+        LIMIT ?
+    """
+    res = conn.execute(query, (f"%{nombre}%", limit)).fetchall()
+    conn.close()
+    return res
 
 def get_all_products_for_display(search_term: str = "", sort_by: str = "nombre_asc"):
     """
@@ -1069,30 +1724,31 @@ def get_all_products_for_display(search_term: str = "", sort_by: str = "nombre_a
         "nombre_desc": "p.nombre DESC",
         "stock_asc": "p.stock ASC",
         "stock_desc": "p.stock DESC",
+        "codigo_asc": "p.codigo ASC",
+        "codigo_desc": "p.codigo DESC",
     }
     order_clause = sort_map.get(sort_by, "p.nombre ASC")
 
     base_query = f"""
         SELECT 
-            p.codigo, p.nombre, p.categoria, p.fabricante, p.descripcion,
-            p.precio_venta, p.precio_compra, p.unidad, p.stock, p.stock_minimo,
-            p.fecha_ingreso, s.nombre as proveedor,
-            (p.stock * p.precio_compra) as importe_inventario
+            p.codigo, p.codigo as id, p.codigo as sku, p.nombre, p.categoria, p.fabricante, p.descripcion,
+            p.precio_venta, p.precio_compra, p.costo_promedio, p.unidad, 
+            p.stock, p.stock_actual, p.stock_minimo, p.stock_maximo, p.fecha_ingreso, 
+            s.nombre as proveedor_nombre,
+            (p.stock_actual * p.costo_promedio) as valor_inventario
         FROM products p
         LEFT JOIN suppliers s ON p.proveedor_id = s.id
+        WHERE p.deleted_at IS NULL
     """
     
     params = []
     if search_term:
         # Dividimos el término en palabras para una búsqueda más flexible
         words = search_term.split()
-        conditions = []
         for word in words:
             # Cada palabra debe estar presente en nombre, código o descripción
-            conditions.append("(p.nombre LIKE ? OR p.codigo LIKE ? OR p.descripcion LIKE ?)")
+            base_query += " AND (p.nombre LIKE ? OR p.codigo LIKE ? OR p.descripcion LIKE ?)"
             params.extend([f"%{word}%", f"%{word}%", f"%{word}%"])
-        
-        base_query += " WHERE " + " AND ".join(conditions)
     
     base_query += f" ORDER BY {order_clause}"
     
@@ -1121,6 +1777,7 @@ def add_product_from_import(product_data):
         float(product_data.get('Precio Compra', 0.0)),
         product_data.get('unidad'),
         int(product_data.get('STOCK EN ALMACEN', 0)),
+        int(product_data.get('STOCK EN ALMACEN', 0)), # stock_actual
         int(product_data.get('stock_minimo', 5)), # Valor por defecto
         proveedor_id,
         product_data.get('FECHA INGRESO')
@@ -1130,8 +1787,8 @@ def add_product_from_import(product_data):
     cursor.execute('''
         INSERT OR REPLACE INTO products (
             codigo, nombre, fabricante, categoria, descripcion, 
-            precio_venta, precio_compra, unidad, stock, stock_minimo, proveedor_id, fecha_ingreso
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            precio_venta, precio_compra, unidad, stock, stock_actual, stock_minimo, proveedor_id, fecha_ingreso
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', data_tuple)
     
     conn.commit()
@@ -1221,15 +1878,16 @@ def bulk_add_products(products):
             params = (
                 p_data['codigo'], p_data['nombre'], p_data['fabricante'], p_data['categoria'], 
                 p_data['descripcion'], p_data['precio_venta'], p_data['precio_compra'], 
-                p_data['unidad'], p_data['stock'], p_data['stock_minimo'], 
+                p_data['unidad'], p_data['stock'], p_data['stock'], # stock_actual
+                p_data['stock_minimo'], 
                 proveedor_id, p_data['fecha_ingreso']
             )
 
             cursor.execute('''
                 INSERT OR REPLACE INTO products (
                     codigo, nombre, fabricante, categoria, descripcion, 
-                    precio_venta, precio_compra, unidad, stock, stock_minimo, proveedor_id, fecha_ingreso
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    precio_venta, precio_compra, unidad, stock, stock_actual, stock_minimo, proveedor_id, fecha_ingreso
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', params)
         
         conn.commit()
@@ -1241,3 +1899,200 @@ def bulk_add_products(products):
 
 if __name__ == "__main__":
     init_db()
+
+def get_report_sales_grouped(start_date, end_date, agrupar_por='producto', ordenar_por='cantidad'):
+    """Lista de ventas agrupadas por producto o categoría con rentabilidad (Protegida contra Inyección SQL)."""
+    conn = get_connection()
+    
+    # VALIDACIÓN: Lista blanca para evitar inyección SQL por parámetros dinámicos
+    allowed_groups = {
+        'producto': 'p.nombre',
+        'categoria': "COALESCE(p.categoria, 'SIN CATEGORIA')"
+    }
+    allowed_orders = {
+        'cantidad': 'cant_vendida',
+        'total': 'total_generado'
+    }
+    
+    group_col = allowed_groups.get(agrupar_por, 'p.nombre')
+    order_col = allowed_orders.get(ordenar_por, 'cant_vendida')
+    
+    query = f"""
+        SELECT 
+            {group_col} as nombre,
+            SUM(td.quantity) as cant_vendida,
+            SUM(td.unit_price * td.quantity) as total_generado,
+            SUM(p.precio_compra * td.quantity) as costo_total
+        FROM transaction_details td
+        JOIN products p ON td.producto_codigo = p.codigo
+        JOIN transactions t ON td.transaction_id = t.id
+        WHERE (date(t.date) BETWEEN date(?) AND date(?))
+          AND t.status != 'VOIDED'
+        GROUP BY {group_col}
+        ORDER BY {order_col} DESC
+    """
+    res = conn.execute(query, (start_date, end_date)).fetchall()
+    conn.close()
+    return res
+
+def run_backup_professional(backup_dir="backups_sistema", keep_days=7):
+    """Realiza un respaldo seguro de la base de datos usando la API de SQLite y lo comprime."""
+    if not os.path.exists(backup_dir):
+        os.makedirs(backup_dir)
+        print(f"Carpeta '{backup_dir}' creada.")
+
+    today_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    temp_db_path = os.path.join(backup_dir, f"temp_erp_{today_str}.db")
+    zip_path = os.path.join(backup_dir, f"erp_system_{today_str}.zip")
+
+    try:
+        # 1. Backup seguro usando la API de SQLite (funciona aunque la DB esté abierta)
+        src = get_connection()
+        dst = sqlite3.connect(temp_db_path)
+        with dst:
+            src.backup(dst)
+        dst.close()
+        src.close()
+
+        # 2. Comprimir en ZIP para ahorrar espacio
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(temp_db_path, arcname="erp_system.db")
+        
+        # 3. Eliminar el temporal .db
+        if os.path.exists(temp_db_path):
+            os.remove(temp_db_path)
+        
+        print(f"Respaldo comprimido creado: {zip_path}")
+        
+        # 4. Limpieza de antiguos
+        cleanup_old_backups(backup_dir, keep_days)
+        
+        return zip_path
+    except Exception as e:
+        if os.path.exists(temp_db_path):
+            os.remove(temp_db_path)
+        print(f"Error en respaldo profesional: {e}")
+        return None
+
+def void_sale(transaction_id, authorizing_user_id, reason):
+    """Anula una venta, devuelve el stock al inventario y anula comisiones."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # 1. Verificar si la venta ya está anulada
+        sale = cursor.execute("SELECT status, correlativo FROM transactions WHERE id = ?", (transaction_id,)).fetchone()
+        if not sale:
+            raise ValueError("La venta no existe.")
+        if sale['status'] == 'VOIDED':
+            raise ValueError("La venta ya se encuentra anulada.")
+
+        # 2. Devolver Stock al inventario
+        items = cursor.execute("SELECT producto_codigo, quantity FROM transaction_details WHERE transaction_id = ?", (transaction_id,)).fetchall()
+        for item in items:
+            cursor.execute("""
+                UPDATE products 
+                SET stock = stock + ?, 
+                    stock_actual = stock_actual + ? 
+                WHERE codigo = ?
+            """, (item['quantity'], item['quantity'], item['producto_codigo']))
+
+        # 3. Anular comisiones generadas por esta venta
+        cursor.execute("DELETE FROM commissions_earned WHERE transaction_id = ?", (transaction_id,))
+
+        # 4. Actualizar estado de la transacción y registrar auditoría
+        cursor.execute("""
+            UPDATE transactions 
+            SET status = 'VOIDED', 
+                voided_by_user_id = ?, 
+                void_reason = ? 
+            WHERE id = ?
+        """, (authorizing_user_id, reason, transaction_id))
+
+        conn.commit()
+        return True, f"Venta {sale['correlativo']} anulada exitosamente."
+    except Exception as e:
+        conn.rollback()
+        return False, str(e)
+    finally:
+        conn.close()
+
+def cleanup_old_backups(backup_dir, keep_days):
+    """Elimina respaldos más antiguos que keep_days."""
+    cutoff = datetime.now() - timedelta(days=keep_days)
+    files = os.listdir(backup_dir)
+    for f in files:
+        f_path = os.path.join(backup_dir, f)
+        # Procesar .zip y .db que empiecen con erp_system o temp_erp
+        if os.path.isfile(f_path) and (f.endswith(".zip") or f.endswith(".db")):
+            file_time = datetime.fromtimestamp(os.path.getctime(f_path))
+            if file_time < cutoff:
+                try:
+                    os.remove(f_path)
+                    print(f"Respaldo antiguo eliminado: {f}")
+                except Exception as e:
+                    print(f"No se pudo eliminar {f}: {e}")
+
+def get_product_units(codigo):
+    """Obtiene todas las presentaciones/unidades de un producto."""
+    conn = get_connection()
+    res = conn.execute("SELECT * FROM product_units WHERE producto_codigo = ? ORDER BY factor_conversion ASC", (codigo,)).fetchall()
+    conn.close()
+    return res
+
+def add_product_unit(codigo, nombre, factor, precio):
+    """Añade una nueva presentación a un producto."""
+    conn = get_connection()
+    try:
+        conn.execute("INSERT INTO product_units (producto_codigo, nombre_unidad, factor_conversion, precio_venta) VALUES (?, ?, ?, ?)",
+                   (codigo, nombre, factor, precio))
+        conn.commit()
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+def delete_product_unit(unit_id):
+    """Elimina una presentación específica."""
+    conn = get_connection()
+    conn.execute("DELETE FROM product_units WHERE id = ?", (unit_id,))
+    conn.commit()
+    conn.close()
+
+def get_dashboard_stats():
+    """Calcula estadísticas generales para el dashboard principal incluyendo desglose de pagos."""
+    conn = get_connection()
+    try:
+        hoy = get_lima_time()[:10]
+
+        # 1. Ventas de hoy (Suma de totales de ventas no anuladas)
+        res_sales = conn.execute("SELECT SUM(total) FROM transactions WHERE date(date) = date(?) AND status != 'VOIDED'", (hoy,)).fetchone()
+        sales_today = res_sales[0] if res_sales and res_sales[0] is not None else 0.0
+
+        # 2. Desglose por método de pago (Hoy)
+        res_methods = conn.execute("""
+            SELECT metodo_pago, SUM(total) as total 
+            FROM transactions 
+            WHERE date(date) = date(?) AND status != 'VOIDED'
+            GROUP BY metodo_pago
+        """, (hoy,)).fetchall()
+
+        methods_today = {row['metodo_pago']: row['total'] for row in res_methods}
+
+        # 3. Total de clientes
+        res_clients = conn.execute("SELECT COUNT(*) FROM customers").fetchone()
+        total_clients = res_clients[0] if res_clients else 0
+
+        # 4. Total de productos (SKUs distintos)
+        res_products = conn.execute("SELECT COUNT(*) FROM products").fetchone()
+        total_products = res_products[0] if res_products else 0
+
+        return {
+            "sales_today": sales_today,
+            "methods_today": methods_today,
+            "total_clients": total_clients,
+            "total_products": total_products
+        }
+    finally:
+        conn.close()
+
