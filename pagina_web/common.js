@@ -3,6 +3,68 @@ const API_URL = "http://127.0.0.1:8000";
 
 // --- UTILIDADES ---
 
+// --- UTILIDADES DE IMPRESIÓN Y PDF ---
+
+async function descargarPDF(id, formato = '80mm') {
+    if (!id) return alert("ID de venta no válido");
+    
+    const notify = typeof showToast === 'function' ? showToast : alert;
+    notify(`Generando PDF ${formato}...`);
+
+    try {
+        // 1. Obtener el HTML completo del servidor
+        const response = await fetch(`${API_URL}/ventas/${id}/ticket?format=${formato}&no_print=true`);
+        const htmlText = await response.text();
+        
+        // 2. Crear un iframe invisible para renderizar el HTML de forma aislada y correcta
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.left = '-9999px';
+        iframe.style.visibility = 'hidden';
+        document.body.appendChild(iframe);
+        
+        // 3. Escribir el HTML en el iframe
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(htmlText);
+        doc.close();
+
+        // 4. Esperar un momento a que el navegador procese los estilos y fuentes
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // 5. Obtener el contenedor del ticket dentro del iframe
+        const ticketElement = doc.querySelector('.ticket-container') || doc.body;
+        
+        const isA4 = formato.toUpperCase() === 'A4';
+        const opt = {
+            margin: isA4 ? 10 : 2,
+            filename: `Recibo_ROLIK_${id}.pdf`,
+            image: { type: 'jpeg', quality: 1 },
+            html2canvas: { 
+                scale: 3, 
+                useCORS: true, 
+                logging: false,
+                backgroundColor: '#ffffff'
+            },
+            jsPDF: { 
+                unit: 'mm', 
+                format: isA4 ? 'a4' : [80, 250], 
+                orientation: 'portrait' 
+            }
+        };
+
+        // 6. Generar el PDF
+        await html2pdf().set(opt).from(ticketElement).save();
+        
+        // 7. Limpiar
+        document.body.removeChild(iframe);
+        if (typeof showToast === 'function') notify("¡PDF Descargado!");
+    } catch (e) {
+        console.error("Error PDF:", e);
+        alert("Error al generar PDF: " + e.message);
+    }
+}
+
 function formatCurrency(amount) {
     return "S/ " + parseFloat(amount).toFixed(2);
 }

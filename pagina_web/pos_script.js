@@ -33,16 +33,51 @@ function setMetodo(metodo) {
 document.addEventListener('DOMContentLoaded', () => {
     cargarProductosEnCache();
     const searchInput = document.getElementById('pos_search');
+
+    // SISTEMA HÍBRIDO - FOCO AUTOMÁTICO
     if (searchInput) {
+        searchInput.focus();
+
         searchInput.addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             if (query.length < 2) {
-                document.getElementById('pos_results').innerHTML = '<p style="text-align: center; color: var(--text-muted); margin-top: 50px;">Escribe para buscar productos...</p>';
+                // Restaurar mensaje inicial
+                document.getElementById('pos_results').innerHTML = `
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); opacity: 0.5; margin-top: 50px;">
+                        <i class="fas fa-barcode" style="font-size: 48px; margin-bottom: 15px;"></i>
+                        <p style="margin: 0; font-size: 16px;">Escribe para buscar o escanea un producto...</p>
+                    </div>
+                `;
                 return;
             }
             ejecutarBusquedaInteligente(query);
         });
+
+        // SOPORTE LECTORA: Detectar Enter
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const code = searchInput.value.trim();
+                if (code.length > 0) {
+                    const product = cachedProducts.find(p => p.codigo.toLowerCase() === code.toLowerCase());
+                    if (product) {
+                        addToCart(product);
+                        limpiarBusqueda();
+                        showToast(`Agregado: ${product.nombre}`);
+                    } else {
+                        ejecutarBusquedaInteligente(code);
+                    }
+                }
+            }
+        });
     }
+
+    // Re-enfocar el buscador
+    window.addEventListener('click', (e) => {
+        const activeModal = document.querySelector('.modal[style*="display: block"]');
+        if (!activeModal) {
+            if (searchInput) searchInput.focus();
+        }
+    });
 
     // Autocompletado de clientes
     const chkNombre = document.getElementById('chk_nombre');
@@ -57,6 +92,51 @@ document.addEventListener('DOMContentLoaded', () => {
         chkDoc.addEventListener('blur', () => setTimeout(() => ocultarSugerencias('documento'), 200));
     }
 });
+
+function limpiarBusqueda() {
+    const input = document.getElementById('pos_search');
+    if (input) {
+        input.value = "";
+        input.focus();
+    }
+    const results = document.getElementById('pos_results');
+    if (results) {
+        results.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); opacity: 0.5; margin-top: 50px;">
+                <i class="fas fa-barcode" style="font-size: 48px; margin-bottom: 15px;"></i>
+                <p style="margin: 0; font-size: 16px;">Escribe para buscar o escanea un producto...</p>
+            </div>
+        `;
+    }
+}
+
+function renderFavoritos() {
+    const container = document.getElementById('quick_access_container');
+    if (!container) return;
+    
+    const favoritos = cachedProducts
+        .filter(p => p.stock_actual > 0)
+        .slice(0, 10);
+
+    container.innerHTML = favoritos.map(p => `
+        <button class="btn btn-secondary" style="background: rgba(59, 130, 246, 0.1); border: 1px solid #334155; color: white; padding: 12px 15px; border-radius: 10px; font-size: 13px; font-weight: bold; transition: all 0.2s;" onclick='addToCart(${JSON.stringify(p)})'>
+            <i class="fas fa-star" style="color: #f59e0b; margin-right: 5px; font-size: 10px;"></i> ${p.nombre.substring(0, 15)}
+        </button>
+    `).join('') || '<p style="color:var(--text-muted); font-size:12px;">Sin productos favoritos configurados.</p>';
+}
+
+function showToast(message) {
+    let toast = document.getElementById('pos_toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'pos_toast';
+        toast.style = "position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #22c55e; color: white; padding: 12px 25px; border-radius: 50px; font-weight: bold; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); z-index: 9999; display: none; border: 2px solid rgba(255,255,255,0.2);";
+        document.body.appendChild(toast);
+    }
+    toast.innerText = message;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 2000);
+}
 
 async function buscarClientesAutocomplete(query, tipo) {
     const suggestionsId = `suggestions_${tipo}`;
@@ -165,9 +245,14 @@ function renderSearchResults(products, query = "") {
         div.className = "product-item";
         const isLowStock = p.stock_actual <= p.stock_minimo;
         
+        // Formatear unidades para mostrar en la lista
+        const unidadesDesc = p.unidad ? `<span class="badge badge-blue" style="font-size: 10px; margin-left: 5px;">${p.unidad}</span>` : "";
+
         div.innerHTML = `
             <div style="flex: 1; padding-right: 15px;">
-                <div style="color: white; font-weight: 700; font-size: 15px; margin-bottom: 4px;">${p.nombre}</div>
+                <div style="color: white; font-weight: 700; font-size: 16px; margin-bottom: 4px;">
+                    ${p.nombre} ${unidadesDesc}
+                </div>
                 <div style="display: flex; gap: 15px; align-items: center;">
                     <span style="color: var(--accent-color); font-family: monospace; font-size: 13px;">${p.codigo}</span>
                     <span style="color: var(--text-muted); font-size: 13px;">Stock: 
@@ -176,9 +261,9 @@ function renderSearchResults(products, query = "") {
                 </div>
             </div>
             <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
-                <div style="font-size: 20px; color: #fff; font-weight: bold;">S/ ${p.precio_venta.toFixed(2)}</div>
-                <button class="btn btn-primary" style="padding: 8px 16px; font-size: 12px; border-radius: 6px;" onclick='addToCart(${JSON.stringify(p)})'>
-                    <i class="fas fa-cart-plus"></i> AÑADIR
+                <div style="font-size: 22px; color: #22c55e; font-weight: 900;">S/ ${p.precio_venta.toFixed(2)}</div>
+                <button class="btn btn-primary" style="padding: 10px 20px; font-size: 13px; border-radius: 8px; font-weight: bold;" onclick='addToCart(${JSON.stringify(p)})'>
+                    <i class="fas fa-plus-circle"></i> SELECCIONAR
                 </button>
             </div>
         `;
@@ -496,6 +581,15 @@ function closeSuccessModal() {
 }
 
 function imprimirTicket(id, format) { window.open(`${API_URL}/ventas/${id}/ticket?format=${format}`, '_blank'); }
+
+function abrirWhatsAppSolo() {
+    const clienteNombre = document.getElementById('chk_nombre').value || "Cliente";
+    const telefono = prompt(`Ingrese el número de WhatsApp para ${clienteNombre}:`, "");
+    if (telefono) {
+        const mensaje = encodeURIComponent(`Hola ${clienteNombre}, le envío su recibo de ROLIK. Por favor, adjunte el archivo PDF que se acaba de descargar.`);
+        window.open(`https://wa.me/51${telefono}?text=${mensaje}`, '_blank');
+    }
+}
 
 async function buscarClienteCheckout() {
     const doc = document.getElementById('chk_documento').value;

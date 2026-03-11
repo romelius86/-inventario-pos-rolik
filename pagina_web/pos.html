@@ -188,6 +188,34 @@
             background: #0f172a;
         }
 
+        /* Estilos para botones de selección de unidades */
+        .unit-btn {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            padding: 15px 20px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid #3b82f6;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: all 0.2s;
+            margin-bottom: 10px;
+        }
+        .unit-btn:hover {
+            background: #3b82f6;
+            transform: translateY(-2px);
+        }
+        .unit-btn strong {
+            color: #22c55e;
+            font-size: 16px;
+        }
+        .unit-btn:hover strong {
+            color: white;
+        }
+
     </style>
 </head>
 <body>
@@ -225,8 +253,8 @@
                 <div class="pos-container">
                     <section class="product-selection">
                         <div style="position: relative; margin-bottom: 20px;">
-                            <i class="fas fa-search" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 16px;"></i>
-                            <input type="text" id="pos_search" placeholder="Buscar producto por nombre o código..." style="width: 100%; background: #0f172a; border: 1px solid var(--border-color); color: white; padding: 15px 15px 15px 45px; border-radius: 8px; font-size: 15px; outline: none; box-sizing: border-box; transition: border-color 0.2s;">
+                            <i class="fas fa-barcode" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--accent-color); font-size: 18px;"></i>
+                            <input type="text" id="pos_search" placeholder="Escanee código o busque por nombre..." style="width: 100%; background: #0f172a; border: 1px solid var(--border-color); color: white; padding: 15px 15px 15px 45px; border-radius: 8px; font-size: 15px; outline: none; box-sizing: border-box; transition: border-color 0.2s;">
                         </div>
                         <div class="search-results" id="pos_results">
                             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); opacity: 0.5; margin-top: 50px;">
@@ -380,18 +408,20 @@
             <h2 style="margin-bottom: 10px;">¡Venta Exitosa!</h2>
             <p style="color: #94a3b8; margin-bottom: 25px;">¿Qué desea hacer con el comprobante?</p>
             
-            <div style="display: grid; gap: 10px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button class="btn btn-primary" onclick="descargarPDF(last_sale_id, '80mm')" style="background: #ef4444; padding: 12px; font-size: 13px;">
+                    <i class="fas fa-file-pdf"></i> PDF TICKET
+                </button>
+                <button class="btn btn-primary" onclick="descargarPDF(last_sale_id, 'A4')" style="background: #dc2626; padding: 12px; font-size: 13px;">
+                    <i class="fas fa-file-pdf"></i> PDF A4
+                </button>
+            </div>
+            <button class="btn btn-primary" onclick="abrirWhatsAppSolo()" style="background: #25d366; width: 100%; padding: 12px;">
+                <i class="fab fa-whatsapp"></i> ABRIR WHATSAPP CLIENTE
+            </button>
+                <hr style="border: 0; border-top: 1px solid #334155; margin: 10px 0;">
                 <button class="btn btn-primary" onclick="imprimirTicket(last_sale_id, '80mm')" style="background: #3b82f6; width: 100%; padding: 12px;">
                     <i class="fas fa-receipt"></i> IMPRIMIR TICKET (80mm)
-                </button>
-                <button class="btn btn-primary" onclick="imprimirTicket(last_sale_id, 'A4')" style="background: #6366f1; width: 100%; padding: 12px;">
-                    <i class="fas fa-file-invoice"></i> IMPRIMIR A4
-                </button>
-                <button class="btn btn-primary" onclick="enviarWhatsApp()" style="background: #25d366; width: 100%; padding: 12px;">
-                    <i class="fab fa-whatsapp"></i> ENVIAR A WHATSAPP
-                </button>
-                <button class="btn btn-primary" onclick="enviarEmail()" style="background: #f59e0b; width: 100%; padding: 12px;">
-                    <i class="fas fa-envelope"></i> ENVIAR POR CORREO
                 </button>
                 <hr style="border: 0; border-top: 1px solid #334155; margin: 15px 0;">
                 <button class="btn-cancel" onclick="closeSuccessModal()" style="width: 100%; padding: 10px; border-radius: 6px;">
@@ -401,6 +431,24 @@
         </div>
     </div>
 
+    <!-- MODAL SELECCIÓN DE PRESENTACIÓN (Unidad, Docena, etc) -->
+    <div id="pos_unit_modal" class="modal">
+        <div class="modal-content" style="max-width: 450px; background: #1e293b; color: white; border-radius: 12px; border: 1px solid #3b82f6;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin:0; font-size: 18px;">Seleccionar Presentación</h2>
+                <button onclick="document.getElementById('pos_unit_modal').style.display='none'" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;">&times;</button>
+            </div>
+            <p style="color: #94a3b8; margin-bottom: 20px; font-size: 14px;">Elija cómo desea vender este producto:</p>
+            <div id="unit_options_list" style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- Las opciones se cargan dinámicamente -->
+            </div>
+            <div style="margin-top: 25px; text-align: right;">
+                <button onclick="document.getElementById('pos_unit_modal').style.display='none'" class="btn btn-secondary" style="padding: 10px 20px; border-radius: 8px; font-size: 13px;">CANCELAR</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="common.js?v=2"></script>
     <script src="pos_script.js?v=2"></script>
     <script>checkAccess();</script>

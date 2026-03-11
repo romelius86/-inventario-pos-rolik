@@ -69,17 +69,37 @@
                     </div>
                 </div>
 
-                <div class="summary-section">
-                    <div class="table-card" style="padding: 30px;">
+                <div class="summary-section" style="display: grid; grid-template-columns: 1fr 350px; gap: 20px;">
+                    <div class="table-card">
+                        <h3><i class="fas fa-exclamation-triangle" style="color: var(--danger);"></i> Productos con Stock Crítico</h3>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>SKU</th>
+                                        <th>Stock</th>
+                                        <th>Mínimo</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="low_stock_table">
+                                    <tr><td colspan="5" style="text-align:center;">Cargando alertas...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="table-card">
                         <h3 style="margin-top:0; margin-bottom:20px;">Accesos Rápidos</h3>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px;">
-                            <a href="pos.html" id="quick_pos" class="btn btn-primary" style="justify-content: center; text-decoration:none;">
+                        <div style="display: flex; flex-direction: column; gap: 15px;">
+                            <a href="pos.html" id="quick_pos" class="btn btn-primary" style="justify-content: center; text-decoration:none; padding: 15px;">
                                 <i class="fas fa-plus"></i> NUEVA VENTA
                             </a>
-                            <a href="index.html" id="quick_inv" class="btn btn-secondary" style="justify-content: center; text-decoration:none;">
+                            <a href="index.html" id="quick_inv" class="btn btn-secondary" style="justify-content: center; text-decoration:none; padding: 15px;">
                                 <i class="fas fa-eye"></i> VER ALMACÉN
                             </a>
-                            <a href="reportes.html" id="quick_rep" class="btn btn-secondary" style="justify-content: center; text-decoration:none;">
+                            <a href="reportes.html" id="quick_rep" class="btn btn-secondary" style="justify-content: center; text-decoration:none; padding: 15px;">
                                 <i class="fas fa-chart-bar"></i> ESTADÍSTICAS
                             </a>
                         </div>
@@ -96,36 +116,43 @@
         document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('today_date').textContent = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             
-            // Restringir visualización de ventas en Dashboard para vendedores si no tienen permiso
-            if (!hasPermission('report.view.sales')) {
-                document.getElementById('kpi_sales_box').style.display = 'none';
-                document.getElementById('quick_rep').style.display = 'none';
-            }
-            if (!hasPermission('pos.use')) document.getElementById('quick_pos').style.display = 'none';
-
             try {
                 const response = await fetch(`${API_URL}/reportes/dashboard`);
                 if (!response.ok) throw new Error("Error en la respuesta del servidor");
 
                 const data = await response.json();
-                console.log("Datos recibidos en dashboard:", data); // Esto te permitirá ver los datos en F12
-
+                
                 // Actualizar contadores
-                if (document.getElementById('kpi_ventas')) {
-                    document.getElementById('kpi_ventas').textContent = `S/ ${(data.sales_today || 0).toFixed(2)}`;
-                }
-                if (document.getElementById('kpi_productos')) {
-                    document.getElementById('kpi_productos').textContent = data.total_products || 0;
-                }
-                if (document.getElementById('kpi_clientes')) {
-                    document.getElementById('kpi_clientes').textContent = data.total_clients || 0;
-                }
-                if (document.getElementById('kpi_stock')) {
-                    document.getElementById('kpi_stock').textContent = data.alerta_stock || 0;
+                document.getElementById('kpi_ventas').textContent = formatCurrency(data.sales_today || 0);
+                document.getElementById('kpi_productos').textContent = data.total_products || 0;
+                document.getElementById('kpi_clientes').textContent = data.total_clients || 0;
+                document.getElementById('kpi_stock').textContent = data.alerta_stock || 0;
+
+                // Renderizar tabla de stock bajo
+                const tableBody = document.getElementById('low_stock_table');
+                tableBody.innerHTML = "";
+                
+                // Obtener detalles de stock bajo
+                const resStock = await fetch(`${API_URL}/reportes/stock-bajo`);
+                const products = await resStock.json();
+
+                if (products.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--success); padding: 20px;">Todo el stock está al día. <i class="fas fa-check-circle"></i></td></tr>';
+                } else {
+                    products.slice(0, 8).forEach(p => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><strong>${p.nombre}</strong></td>
+                            <td><span class="badge badge-blue">${p.codigo}</span></td>
+                            <td><span class="badge badge-red">${p.stock}</span></td>
+                            <td>${p.stock_minimo}</td>
+                            <td><a href="compras.html?sku=${p.codigo}" class="btn btn-primary" style="padding: 5px 10px; font-size: 11px;">COMPRAR</a></td>
+                        `;
+                        tableBody.appendChild(tr);
+                    });
                 }
 
                 const sessRes = await fetch(`${API_URL}/caja/sesion-activa`);
-
                 const sessData = await sessRes.json();
                 if (sessData.active) document.getElementById('session_banner').style.display = 'block';
             } catch (error) { console.error(error); }

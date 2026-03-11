@@ -63,6 +63,7 @@ function renderInventory(products) {
             <td><strong>S/ ${valorTotal}</strong></td>
             <td>
                 <div style="display:flex; gap:5px;">
+                    <button class="btn btn-secondary" title="Historial / Kardex" style="padding:5px 10px; background:#10b981;" onclick="openKardexModal('${p.codigo}', '${p.nombre}')"><i class="fas fa-history"></i></button>
                     <button class="btn btn-secondary btn-units" title="Presentaciones y Precios" style="padding:5px 10px; background:#3b82f6;"><i class="fas fa-layer-group"></i></button>
                     <button class="btn btn-secondary" style="padding:5px 10px;" onclick="openProductModal('${p.codigo}')" title="Editar"><i class="fas fa-edit"></i></button>
                     <button class="btn btn-secondary text-danger" style="padding:5px 10px;" onclick="deleteProduct('${p.codigo}')" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
@@ -408,4 +409,48 @@ async function restoreProduct(codigo) {
 
 async function exportToExcel() {
     window.open(`${API_URL}/inventario/excel`, '_blank');
+}
+
+async function openKardexModal(codigo, nombre) {
+    let modal = document.getElementById('kardex_modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'kardex_modal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 900px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2 id="kardex_title">Kardex del Producto</h2>
+                    <button onclick="document.getElementById('kardex_modal').style.display='none'" class="btn-secondary" style="padding:5px 10px;">&times;</button>
+                </div>
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr><th>Fecha</th><th>Tipo</th><th>Documento</th><th>Cant.</th><th>Precio</th><th>Detalle</th></tr>
+                        </thead>
+                        <tbody id="kardex_tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    document.getElementById('kardex_title').innerText = `Historial de Movimientos: ${nombre}`;
+    try {
+        const res = await fetch(`${API_URL}/productos/${codigo}/kardex`);
+        const movements = await res.json();
+        const tbody = document.getElementById('kardex_tbody');
+        tbody.innerHTML = movements.map(m => `
+            <tr>
+                <td><small>${m.fecha}</small></td>
+                <td><span class="badge ${m.tipo.includes('ENTRADA') ? 'badge-green' : 'badge-red'}" style="background:${m.tipo.includes('ENTRADA') ? '#dcfce7':'#fee2e2'}; color:${m.tipo.includes('ENTRADA') ? '#166534':'#991b1b'}">${m.tipo}</span></td>
+                <td><strong>${m.documento}</strong></td>
+                <td style="text-align:center">${m.cantidad}</td>
+                <td>S/ ${parseFloat(m.precio).toFixed(2)}</td>
+                <td><small>${m.detalle}</small></td>
+            </tr>
+        `).join('') || '<tr><td colspan="6" style="text-align:center">Sin movimientos registrados.</td></tr>';
+        modal.style.display = 'block';
+    } catch (e) { alert("Error al cargar Kardex"); }
 }

@@ -1897,6 +1897,75 @@ def bulk_add_products(products):
     finally:
         conn.close()
 
+def get_profitability_report(start_date=None, end_date=None):
+    """Calcula la utilidad real basada en (Precio Venta - Costo Promedio)."""
+    conn = get_connection()
+    query = """
+        SELECT 
+            p.codigo, 
+            p.nombre, 
+            SUM(td.quantity) as total_vendido,
+            AVG(td.unit_price) as precio_venta_promedio,
+            p.costo_promedio,
+            SUM(td.quantity * (td.unit_price - p.costo_promedio)) as utilidad_total
+        FROM transaction_details td
+        JOIN transactions t ON td.transaction_id = t.id
+        JOIN products p ON td.producto_codigo = p.codigo
+        WHERE t.status != 'VOIDED'
+    """
+    params = []
+    if start_date and end_date:
+        query += " AND t.date BETWEEN ? AND ?"
+        params.extend([start_date, end_date])
+    
+    query += " GROUP BY p.codigo ORDER BY utilidad_total DESC"
+    
+    report = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(r) for r in report]
+
+def get_product_kardex(producto_codigo):
+    """Obtiene el historial completo de entradas y salidas de un producto."""
+    conn = get_connection()
+    # Entradas (Compras)
+    query_entries = """
+        SELECT 
+            po.fecha_pedido as fecha,
+            'ENTRADA (COMPRA)' as tipo,
+            po.numero_oc as documento,
+            pod.cantidad,
+            pod.precio_compra_unitario as precio,
+            'Proveedor: ' || s.nombre as detalle
+        FROM purchase_order_details pod
+        JOIN purchase_orders po ON pod.pedido_id = po.id
+        JOIN suppliers s ON po.proveedor_id = s.id
+        WHERE pod.producto_codigo = ? AND po.estado = 'RECIBIDO'
+    """
+    
+    # Salidas (Ventas)
+    query_exits = """
+        SELECT 
+            t.date as fecha,
+            'SALIDA (VENTA)' as tipo,
+            t.tipo_comprobante || ' ' || t.correlativo as documento,
+            td.quantity as cantidad,
+            td.unit_price as precio,
+            'Cliente: ' || t.cliente_nombre as detalle
+        FROM transaction_details td
+        JOIN transactions t ON td.transaction_id = t.id
+        WHERE td.producto_codigo = ? AND t.status != 'VOIDED'
+    """
+    
+    entries = conn.execute(query_entries, (producto_codigo,)).fetchall()
+    exits = conn.execute(query_exits, (producto_codigo,)).fetchall()
+    
+    conn.close()
+    
+    movements = [dict(e) for e in entries] + [dict(x) for x in exits]
+    # Ordenar por fecha descendente
+    movements.sort(key=lambda x: x['fecha'], reverse=True)
+    return movements
+
 if __name__ == "__main__":
     init_db()
 

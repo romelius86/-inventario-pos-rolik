@@ -50,6 +50,10 @@ function showReport(type) {
         case 'ventas_rango':
             title = "Resumen de Ventas y Ganancias";
             break;
+        case 'utilidades':
+            title = "Reporte de Ganancias Reales (Costo vs Venta)";
+            grpMetodo.style.display = 'none';
+            break;
         case 'ventas_producto':
             title = "Detalle de Ventas por Producto";
             searchContainer.style.display = 'block';
@@ -177,6 +181,11 @@ async function loadReportData() {
                 url = `${API_URL}/reportes/vendedores`;
                 data = await (await fetch(url)).json();
                 renderVendedores(data);
+                break;
+            case 'utilidades':
+                url = `${API_URL}/reportes/utilidades?inicio=${start}&fin=${end}`;
+                data = await (await fetch(url)).json();
+                renderUtilidades(data);
                 break;
         }
         // Aplicar filtro si el usuario ya escribió algo antes de cargar
@@ -387,12 +396,28 @@ function renderKardex(data) {
 }
 
 function renderHistorialRecibos(data) {
-    document.getElementById('report_thead').innerHTML = '<tr><th>ID</th><th>Fecha</th><th>Cliente</th><th>Total</th><th>Estado</th></tr>';
+    document.getElementById('report_thead').innerHTML = '<tr><th>ID</th><th>Fecha</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Acciones</th></tr>';
     document.getElementById('report_tbody').innerHTML = data.map(v => `
         <tr onclick="selectReceiptRow(this, ${v.transaction_id})" style="cursor:pointer" data-nombre="${v.cliente}" data-sku="${v.transaction_id}">
-            <td>${v.transaction_id}</td><td><small>${v.transaction_date}</small></td><td>${v.cliente}</td><td><strong>S/ ${(v.transaction_total || 0).toFixed(2)}</strong></td><td>${v.status}</td>
+            <td>${v.transaction_id}</td>
+            <td><small>${v.transaction_date}</small></td>
+            <td>${v.cliente}</td>
+            <td><strong>S/ ${(v.transaction_total || 0).toFixed(2)}</strong></td>
+            <td><span class="badge ${v.status === 'COMPLETED' ? 'badge-green' : 'badge-red'}">${v.status}</span></td>
+            <td>
+                <div style="display:flex; gap:5px;">
+                    <button class="btn btn-secondary" style="padding:5px 8px; background:#3b82f6;" onclick="event.stopPropagation(); editSelectedReceipt_ById(${v.transaction_id})" title="Ver Detalle"><i class="fas fa-eye"></i></button>
+                    <button class="btn btn-secondary" style="padding:5px 8px; background:#ef4444;" onclick="event.stopPropagation(); descargarPDF(${v.transaction_id}, '80mm')" title="Descargar Ticket"><i class="fas fa-file-pdf"></i></button>
+                    <button class="btn btn-secondary" style="padding:5px 8px; background:#dc2626;" onclick="event.stopPropagation(); descargarPDF(${v.transaction_id}, 'A4')" title="Descargar A4"><i class="fas fa-file-invoice"></i></button>
+                </div>
+            </td>
         </tr>
     `).join('');
+}
+
+async function editSelectedReceipt_ById(id) {
+    selectedReceiptId = id;
+    editSelectedReceipt();
 }
 
 function renderVendedores(data) {
@@ -409,8 +434,14 @@ function selectReceiptRow(row, id) {
 }
 
 async function viewSelectedReceipt() {
+    if (!selectedReceiptId) return alert("Seleccione un recibo de la lista.");
+    // Abrir el ticket en una nueva pestaña (por defecto 80mm para vista rápida)
+    window.open(`${API_URL}/ventas/${selectedReceiptId}/ticket?format=80mm`, '_blank');
+}
+
+async function downloadSelectedReceiptA4() {
     if (!selectedReceiptId) return alert("Seleccione un recibo.");
-    window.open(`${API_URL}/ventas/${selectedReceiptId}/ticket`, '_blank');
+    descargarPDF(selectedReceiptId, 'A4');
 }
 
 async function editSelectedReceipt() {
@@ -506,6 +537,42 @@ function filterReportTable() {
     // REORDENAR FÍSICAMENTE: Los mejores resultados suben al tope
     matches.sort((a, b) => b.score - a.score);
     matches.forEach(m => tbody.appendChild(m.row));
+}
+
+function renderUtilidades(data) {
+    const stats = document.getElementById('report_stats');
+    const totalUtilidad = data.reduce((sum, item) => sum + (item.utilidad_total || 0), 0);
+    
+    stats.innerHTML = `
+        <div class="stat-card" style="background: #10b981">
+            <h3>Ganancia Total Neta</h3>
+            <p class="value">S/ ${totalUtilidad.toFixed(2)}</p>
+        </div>
+        <div class="stat-card">
+            <h3>Productos Vendidos</h3>
+            <p class="value">${data.length}</p>
+        </div>
+    `;
+    stats.style.display = 'grid';
+
+    document.getElementById('report_thead').innerHTML = `
+        <tr>
+            <th>Producto</th>
+            <th>Vendidos</th>
+            <th>Precio Venta Prom.</th>
+            <th>Costo Prom.</th>
+            <th>Ganancia Total</th>
+        </tr>
+    `;
+    document.getElementById('report_tbody').innerHTML = data.map(p => `
+        <tr data-nombre="${p.nombre}">
+            <td><strong>${p.nombre}</strong><br><small>${p.codigo}</small></td>
+            <td>${p.total_vendido}</td>
+            <td>S/ ${p.precio_venta_promedio.toFixed(2)}</td>
+            <td>S/ ${p.costo_promedio.toFixed(2)}</td>
+            <td style="color: #10b981; font-weight: bold;">S/ ${p.utilidad_total.toFixed(2)}</td>
+        </tr>
+    `).join('');
 }
 
 function printFromModal() {
