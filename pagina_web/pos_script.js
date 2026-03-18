@@ -240,35 +240,49 @@ function renderSearchResults(products, query = "") {
         return;
     }
 
-    products.forEach(p => {
-        const div = document.createElement('div');
-        div.className = "product-item";
-        const isLowStock = p.stock_actual <= p.stock_minimo;
-        
-        // Formatear unidades para mostrar en la lista
-        const unidadesDesc = p.unidad ? `<span class="badge badge-blue" style="font-size: 10px; margin-left: 5px;">${p.unidad}</span>` : "";
+        products.forEach(p => {
+            const div = document.createElement('div');
+            div.className = "product-item";
+            const isLowStock = p.stock_actual <= p.stock_minimo;
+            
+            // Calcular stock en unidades individuales para visualización
+            let stockDisplay = p.stock_actual;
+            let factor = 1;
+            const unidadUpper = (p.unidad || "").toUpperCase();
+            if (unidadUpper.includes("MILLAR")) factor = 1000;
+            else if (unidadUpper.includes("CIENTO")) factor = 100;
+            else if (unidadUpper.includes("DOCENA")) factor = 12;
 
-        div.innerHTML = `
-            <div style="flex: 1; padding-right: 15px;">
-                <div style="color: white; font-weight: 700; font-size: 16px; margin-bottom: 4px;">
-                    ${p.nombre} ${unidadesDesc}
+            if (factor > 1) {
+                const totalUnits = p.stock_actual * factor;
+                stockDisplay = `${p.stock_actual} ${p.unidad} (${totalUnits} UND)`;
+            } else {
+                stockDisplay = `${p.stock_actual} ${p.unidad || 'UND'}`;
+            }
+
+            const unidadesDesc = p.unidad ? `<span class="badge badge-blue" style="font-size: 10px; margin-left: 5px;">${p.unidad}</span>` : "";
+
+            div.innerHTML = `
+                <div style="flex: 1; padding-right: 15px;">
+                    <div style="color: white; font-weight: 700; font-size: 16px; margin-bottom: 4px;">
+                        ${p.nombre} ${unidadesDesc}
+                    </div>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        <span style="color: var(--accent-color); font-family: monospace; font-size: 13px;">${p.codigo}</span>
+                        <span style="color: var(--text-muted); font-size: 13px;">Stock: 
+                            <span class="badge ${isLowStock ? 'badge-red' : 'badge-green'}" style="padding: 2px 8px; font-size: 11px;">${stockDisplay}</span>
+                        </span>
+                    </div>
                 </div>
-                <div style="display: flex; gap: 15px; align-items: center;">
-                    <span style="color: var(--accent-color); font-family: monospace; font-size: 13px;">${p.codigo}</span>
-                    <span style="color: var(--text-muted); font-size: 13px;">Stock: 
-                        <span class="badge ${isLowStock ? 'badge-red' : 'badge-green'}" style="padding: 2px 8px; font-size: 11px;">${p.stock_actual}</span>
-                    </span>
+                <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                    <div style="font-size: 22px; color: #22c55e; font-weight: 900;">S/ ${p.precio_venta.toFixed(2)}</div>
+                    <button class="btn btn-primary" style="padding: 10px 20px; font-size: 13px; border-radius: 8px; font-weight: bold;" onclick='addToCart(${JSON.stringify(p)})'>
+                        <i class="fas fa-plus-circle"></i> SELECCIONAR
+                    </button>
                 </div>
-            </div>
-            <div style="text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
-                <div style="font-size: 22px; color: #22c55e; font-weight: 900;">S/ ${p.precio_venta.toFixed(2)}</div>
-                <button class="btn btn-primary" style="padding: 10px 20px; font-size: 13px; border-radius: 8px; font-weight: bold;" onclick='addToCart(${JSON.stringify(p)})'>
-                    <i class="fas fa-plus-circle"></i> SELECCIONAR
-                </button>
-            </div>
-        `;
-        resultsDiv.appendChild(div);
-    });
+            `;
+            resultsDiv.appendChild(div);
+        });
 }
 
 async function addToCart(product) {
@@ -371,13 +385,14 @@ function renderCart() {
         const div = document.createElement('div');
         div.className = "cart-item";
         div.innerHTML = `
-            <div style="flex-grow: 1;">
-                <strong style="color: white;">${item.nombre}</strong><br>
-                <input type="number" value="${item.cantidad}" min="1" onchange="updateCartItem(${index}, 'cantidad', this.value)" style="width: 45px; background:#1e293b; border:1px solid #334155; color:white; border-radius:4px; padding:2px;">
-                x S/ <input type="number" value="${item.precio_venta.toFixed(2)}" step="0.01" onchange="updateCartItem(${index}, 'precio', this.value)" style="width: 75px; background:#1e293b; border:1px solid #334155; color:var(--success); font-weight:bold; border-radius:4px; padding:2px;">
+            <div style="flex-grow: 1; cursor:pointer;">
+                <strong style="color: white; font-size:14px;" onclick="promptEditQuantity(${index})">${item.nombre}</strong><br>
+                <span onclick="promptEditQuantity(${index})" style="background:#1e293b; border:1px solid #334155; color:white; border-radius:4px; padding:2px 8px; font-weight:bold; display:inline-block; margin-top:4px;">${item.cantidad}</span>
+                <span style="color:var(--text-muted); margin: 0 5px;">x</span>
+                <span onclick="promptEditPrice(${index})" style="background:#1e293b; border:1px solid #334155; color:var(--success); border-radius:4px; padding:2px 8px; font-weight:bold; display:inline-block;">S/ ${item.precio_venta.toFixed(2)}</span>
             </div>
             <div style="text-align: right;">
-                <button onclick="removeFromCart('${item.codigo}')" style="background:none; border:none; color:#ef4444; cursor:pointer;"><i class="fas fa-trash"></i></button><br>
+                <button onclick="removeFromCart('${item.codigo}')" style="background:none; border:none; color:#ef4444; cursor:pointer; padding:5px;"><i class="fas fa-trash"></i></button><br>
                 <strong style="color: var(--success); font-size: 15px;">S/ ${subtotal.toFixed(2)}</strong>
             </div>
         `;
@@ -386,10 +401,26 @@ function renderCart() {
     if (totalSpan) totalSpan.textContent = total.toFixed(2);
 }
 
+function promptEditQuantity(index) {
+    const item = cart[index];
+    const newQty = prompt(`Editar cantidad para ${item.nombre}:`, item.cantidad);
+    if (newQty !== null && newQty !== "") {
+        updateCartItem(index, 'cantidad', newQty);
+    }
+}
+
+function promptEditPrice(index) {
+    const item = cart[index];
+    const newPrice = prompt(`Editar precio para ${item.nombre}:`, item.precio_venta.toFixed(2));
+    if (newPrice !== null && newPrice !== "") {
+        updateCartItem(index, 'precio', newPrice);
+    }
+}
+
 function updateCartItem(index, field, value) {
     const numValue = parseFloat(value);
     if (isNaN(numValue) || numValue < 0) return;
-    if (field === 'cantidad') cart[index].cantidad = Math.max(1, parseInt(numValue));
+    if (field === 'cantidad') cart[index].cantidad = Math.max(0.01, numValue);
     if (field === 'precio') cart[index].precio_venta = numValue;
     renderCart();
     if (document.getElementById('checkout_modal').style.display === 'block') actualizarModalCartList();

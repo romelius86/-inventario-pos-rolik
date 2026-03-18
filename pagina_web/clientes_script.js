@@ -3,7 +3,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     fetchClientes();
     
-    // Configurar el formulario
     const form = document.getElementById('cliente_form');
     if (form) {
         form.addEventListener('submit', async (e) => {
@@ -12,7 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Cerrar modales al hacer clic fuera
+    const searchInput = document.getElementById('cliente_search');
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(() => fetchClientes(), 300));
+    }
+
     window.onclick = function(event) {
         const clienteModal = document.getElementById('cliente_modal');
         const trashModal = document.getElementById('trash_modal');
@@ -33,41 +36,30 @@ async function fetchClientes() {
         renderClientes(clientes);
     } catch (error) {
         if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="error">Error al conectar con el servidor</td></tr>`;
+        notify.error("Error al cargar clientes");
     }
 }
 
 function renderClientes(clientes) {
-    const tbody = document.getElementById('clientes_body');
-    if (!tbody) return;
-    tbody.innerHTML = "";
-    
-    if (clientes.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="loading">No se encontraron clientes activos.</td></tr>`;
-        return;
-    }
-
-    clientes.forEach(c => {
-        const tr = document.createElement('tr');
-        
-        let actionsHtml = `<div style="display: flex; gap: 5px;">`;
-        if (hasPermission('user.edit')) { 
-            actionsHtml += `<button class="action-btn edit-btn" onclick="openClienteModal('${c.documento}')" title="Editar"><i class="fas fa-user-edit"></i></button>`;
+    const columns = [
+        { key: 'documento', formatter: val => `<code>${val}</code>` },
+        { key: 'nombre', formatter: val => `<strong>${val}</strong>` },
+        { key: 'telefono', formatter: val => val || '-' },
+        { key: 'email', formatter: val => val || '-' },
+        { key: 'direccion', formatter: val => `<small class="text-muted">${val || '-'}</small>` },
+        { 
+            key: 'documento', 
+            label: 'Acciones',
+            formatter: (val, c) => `
+                <div style="display: flex; gap: 5px;">
+                    ${hasPermission('user.edit') ? `<button class="action-btn edit-btn" onclick="openClienteModal('${val}')" title="Editar"><i class="fas fa-user-edit"></i></button>` : ''}
+                    ${hasPermission('user.delete') ? `<button class="action-btn delete-btn" onclick="confirmarEliminar('${val}', '${c.nombre}')" title="Mover a Papelera"><i class="fas fa-trash"></i></button>` : ''}
+                </div>
+            `
         }
-        if (hasPermission('user.delete')) {
-            actionsHtml += `<button class="action-btn delete-btn" onclick="confirmarEliminar('${c.documento}', '${c.nombre}')" title="Mover a Papelera"><i class="fas fa-trash"></i></button>`;
-        }
-        actionsHtml += `</div>`;
+    ];
 
-        tr.innerHTML = `
-            <td><code>${c.documento}</code></td>
-            <td><strong>${c.nombre}</strong></td>
-            <td>${c.telefono || '-'}</td>
-            <td>${c.email || '-'}</td>
-            <td><small style="color: var(--text-muted);">${c.direccion || '-'}</small></td>
-            <td>${actionsHtml}</td>
-        `;
-        tbody.appendChild(tr);
-    });
+    renderTable(clientes, columns, 'clientes_body');
 }
 
 function openClienteModal(documento = null) {
@@ -105,20 +97,50 @@ async function loadClienteData(documento) {
         document.getElementById('c_direccion').value = c.direccion || "";
         document.getElementById('c_telefono').value = c.telefono || "";
         document.getElementById('c_email').value = c.email || "";
+
+        // Seleccionar tipo de documento según longitud
+        const doc = c.documento || "";
+        const select = document.getElementById('c_tipo_doc');
+        if (doc.length === 8) select.value = "DNI";
+        else if (doc.length === 11) select.value = "RUC";
+        else select.value = "OTROS";
+
     } catch (error) {
-        alert("Error al cargar datos del cliente");
+        notify.error("Error al cargar datos del cliente");
     }
 }
 
 async function guardarCliente() {
     const clienteData = {
         id: currentClienteId,
-        documento: document.getElementById('c_documento').value,
+        documento: document.getElementById('c_documento').value.trim(),
         nombre: document.getElementById('c_nombre').value,
         direccion: document.getElementById('c_direccion').value,
         telefono: document.getElementById('c_telefono').value,
         email: document.getElementById('c_email').value
     };
+
+    if (!clienteData.documento || !clienteData.nombre) {
+        notify.warn("Documento y Nombre son obligatorios");
+        return;
+    }
+
+    // Validación por Tipo de Documento
+    const tipoDoc = document.getElementById('c_tipo_doc').value;
+    const docLen = clienteData.documento.length;
+
+    if (tipoDoc === "DNI" && docLen !== 8) {
+        notify.error(`El DNI debe tener exactamente 8 dígitos. Ingresado: ${docLen}`);
+        return;
+    }
+    if (tipoDoc === "RUC" && docLen !== 11) {
+        notify.error(`El RUC debe tener exactamente 11 dígitos. Ingresado: ${docLen}`);
+        return;
+    }
+    if (isNaN(clienteData.documento) && (tipoDoc === "DNI" || tipoDoc === "RUC")) {
+        notify.error("El número de documento debe contener solo dígitos");
+        return;
+    }
 
     try {
         const response = await fetch(`${API_URL}/clientes`, {
@@ -130,17 +152,18 @@ async function guardarCliente() {
         if (response.ok) {
             closeClienteModal();
             fetchClientes();
+            notify.success(currentClienteId ? "Cliente actualizado" : "Cliente registrado");
         } else {
             const err = await response.json();
-            alert("Error: " + (err.detail || "No se pudo guardar"));
+            notify.error("Error: " + (err.detail || "No se pudo guardar"));
         }
     } catch (error) {
-        alert("Error de conexión");
+        notify.error("Error de conexión");
     }
 }
 
 function confirmarEliminar(documento, nombre) {
-    if (confirm(`¿Estás seguro de mover a ${nombre} a la papelera?\nPodrás restaurarlo durante los próximos 3 días.`)) {
+    if (confirm(`¿Estás seguro de mover a ${nombre} a la papelera?`)) {
         eliminarCliente(documento);
     }
 }
@@ -153,15 +176,15 @@ async function eliminarCliente(documento) {
 
         if (response.ok) {
             fetchClientes();
+            notify.success("Cliente movido a la papelera");
         } else {
-            alert("Error al eliminar cliente");
+            notify.error("Error al eliminar cliente");
         }
     } catch (error) {
-        alert("Error de conexión");
+        notify.error("Error de conexión");
     }
 }
 
-// Lógica de Papelera
 function openTrashModal() {
     const modal = document.getElementById('trash_modal');
     modal.style.display = "block";
@@ -194,7 +217,7 @@ async function fetchClientesEliminados() {
                 <td>${c.nombre}</td>
                 <td><small>${c.deleted_at}</small></td>
                 <td>
-                    <button class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;" onclick="restaurarCliente('${c.documento}')">
+                    <button class="btn btn-primary" style="padding: 5px 10px; font-size: 12px; background: #22c55e;" onclick="restaurarCliente('${c.documento}')">
                         <i class="fas fa-undo"></i> RESTAURAR
                     </button>
                 </td>
@@ -213,13 +236,13 @@ async function restaurarCliente(documento) {
         });
 
         if (response.ok) {
-            fetchClientesEliminados(); // Actualizar papelera
-            fetchClientes(); // Actualizar lista principal
-            alert("Cliente restaurado correctamente");
+            fetchClientesEliminados();
+            fetchClientes();
+            notify.success("Cliente restaurado correctamente");
         } else {
-            alert("No se pudo restaurar el cliente");
+            notify.error("No se pudo restaurar el cliente");
         }
     } catch (error) {
-        alert("Error de conexión");
+        notify.error("Error de conexión");
     }
 }

@@ -5,14 +5,19 @@ import html
 # Para poder importar database.py que está en la carpeta superior
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import database
 
 from pydantic import BaseModel
 
 app = FastAPI(title="ERP ROLIK API")
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(status_code=204)
 
 @app.on_event("startup")
 def startup_event():
@@ -21,7 +26,7 @@ def startup_event():
 # --- MODELOS PYDANTIC ---
 class SaleItemSchema(BaseModel):
     producto_codigo: str
-    cantidad: int
+    cantidad: float
     precio_unitario: float
     factor: float | None = 1.0
     unidad_nombre: str | None = None
@@ -56,9 +61,9 @@ class ProductSchema(BaseModel):
     precio_venta: float
     precio_compra: float | None = 0.0
     unidad: str | None = "UND"
-    stock: int | None = 0
-    stock_actual: int | None = 0
-    stock_minimo: int = 5
+    stock: float | None = 0.0
+    stock_actual: float | None = 0.0
+    stock_minimo: float = 5.0
     proveedor_nombre: str | None = None
     proveedor_id: int | None = None
 
@@ -77,7 +82,7 @@ class CashMovementSchema(BaseModel):
 
 class POItemSchema(BaseModel):
     codigo: str
-    cantidad: int
+    cantidad: float
     precio_compra: float
 
 class POSchema(BaseModel):
@@ -89,6 +94,14 @@ class POSchema(BaseModel):
 class CustomerSchema(BaseModel):
     id: int | None = None
     documento: str
+    nombre: str
+    direccion: str | None = ""
+    telefono: str | None = ""
+    email: str | None = ""
+
+class SupplierSchema(BaseModel):
+    id: int | None = None
+    ruc_dni: str
     nombre: str
     direccion: str | None = ""
     telefono: str | None = ""
@@ -157,6 +170,15 @@ def guardar_producto(prod: ProductSchema):
         return {"success": True}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+@app.put("/productos/{codigo}")
+def actualizar_producto(codigo: str, prod: ProductSchema):
+    try:
+        data = prod.model_dump()
+        data['codigo'] = codigo 
+        database.add_or_update_product(data)
+        return {"success": True}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/producto/{codigo}")
 def obtener_producto(codigo: str):
     try:
@@ -194,6 +216,15 @@ def listar_clientes(search: str = ""):
     try: return [dict(r) for r in database.get_all_customers(search_term=search)]
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/clientes/{documento}")
+def obtener_cliente(documento: str):
+    try:
+        c = database.get_customer(documento)
+        if not c: raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        return dict(c)
+    except HTTPException as he: raise he
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/clientes")
 def guardar_cliente(cli: CustomerSchema):
     try:
@@ -219,6 +250,22 @@ def listar_proveedores_completo():
     try: return [dict(r) for r in database.get_all_suppliers_full()]
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/proveedores")
+def guardar_proveedor(sup: SupplierSchema):
+    try:
+        database.add_or_update_supplier(sup.model_dump())
+        return {"success": True}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/proveedores/{id}")
+def actualizar_proveedor(id: int, sup: SupplierSchema):
+    try:
+        data = sup.model_dump()
+        data['id'] = id
+        database.add_or_update_supplier(data)
+        return {"success": True}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/proveedores-detalles")
 def listar_proveedores_detalles():
     try: return [dict(r) for r in database.get_all_suppliers_full()]
@@ -231,31 +278,123 @@ def listar_proveedores_simple():
         return [{"id": r["id"], "nombre": r["nombre"]} for r in res]
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/proveedores/{id}")
+def eliminar_proveedor(id: int):
+    try:
+        database.delete_supplier(id)
+        return {"success": True}
+    except ValueError as ve: raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/proveedores-eliminados")
+def listar_proveedores_eliminados():
+    try: return [dict(r) for r in database.get_deleted_suppliers()]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/proveedores/restaurar/{id}")
+def restaurar_proveedor(id: int):
+    try:
+        database.restore_supplier(id)
+        return {"success": True}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
 # --- MODULO: COMPRAS ---
 @app.get("/compras/ordenes")
 def listar_compras():
     try: return [dict(o) for o in database.get_all_purchase_orders()]
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/compras/ordenes/{id}")
+def obtener_detalles_compra(id: int):
+    try:
+        order = database.get_purchase_order_by_id(id)
+        if not order: raise HTTPException(status_code=404, detail="Orden no encontrada")
+        items = database.get_purchase_order_details(id)
+        return {"orden": dict(order), "items": [dict(i) for i in items]}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/compras/ordenes/{id}/estado")
+def actualizar_estado_compra(id: int, estado: str):
+    try:
+        database.update_purchase_order_status(id, estado)
+        return {"success": True}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/compras/ordenes")
 def crear_compra(req: POSchema):
     try:
-        items_list = [item.model_dump() for item in req.items]
+        items_list = [(item.codigo, item.cantidad, item.precio_compra) for item in req.items]
         database.create_purchase_order(req.proveedor_nombre, req.ruc_dni, items_list, req.po_data)
         return {"success": True}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+@app.put("/compras/ordenes/{id}")
+def actualizar_compra(id: int, req: POSchema):
+    try:
+        items_list = [(item.codigo, item.cantidad, item.precio_compra) for item in req.items]
+        database.update_purchase_order(id, req.proveedor_nombre, req.ruc_dni, items_list, req.po_data)
+        return {"success": True}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/compras/ordenes/{id}")
+def eliminar_compra(id: int):
+    try:
+        database.delete_purchase_order(id)
+        return {"success": True}
+    except ValueError as e: raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
 # --- MODULO: VENTAS ---
+@app.get("/ventas/{id}/detalles")
+def obtener_detalles_venta(id: int):
+    try:
+        sale, items = database.get_sale_full_details(id)
+        if not sale: raise HTTPException(status_code=404, detail="No encontrada")
+        return {"venta": dict(sale), "items": [dict(i) for i in items]}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/ventas/{id}/anular")
+def anular_venta(id: int, req: dict):
+    try:
+        success, msg = database.void_sale(id, req.get('user_id'), req.get('reason', 'Sin motivo'))
+        if not success: raise HTTPException(status_code=400, detail=msg)
+        return {"success": True, "message": msg}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/ventas/{id}/editar-basico")
+def editar_basica_venta(id: int, req: dict):
+    try:
+        conn = database.get_connection()
+        conn.execute("UPDATE transactions SET cliente_nombre = ?, cliente_documento = ?, tipo_comprobante = ?, metodo_pago = ? WHERE id = ?", 
+                     (req.get('cliente_nombre'), req.get('cliente_documento'), req.get('tipo_comprobante'), req.get('metodo_pago'), id))
+        conn.commit(); conn.close()
+        return {"success": True}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/ventas")
 def registrar_venta(req: SaleRequest):
     try:
         session = database.get_active_session()
-        if not session: database.open_cash_session(0.0, req.user_id); session = database.get_active_session()
-        cart_items = [(item.producto_codigo, item.cantidad, item.precio_unitario, item.factor, item.unidad_nombre) for item in req.items]
-        payment_data = {"metodo_pago": req.metodo_pago, "tipo_comprobante": req.tipo_comprobante, "cliente_nombre": req.cliente_nombre, "cliente_documento": req.cliente_documento, "monto_pagado": req.monto_pagado, "vuelto": req.vuelto}
+        if not session:
+            database.open_cash_session(0.0, req.user_id)
+            session = database.get_active_session()
+        
+        if not session:
+            raise Exception("No se pudo abrir ni obtener una sesión de caja activa.")
+
+        cart_items = [(item.producto_codigo, item.cantidad, item.precio_unitario, item.factor or 1.0, item.unidad_nombre) for item in req.items]
+        payment_data = {
+            "metodo_pago": req.metodo_pago,
+            "tipo_comprobante": req.tipo_comprobante,
+            "cliente_nombre": req.cliente_nombre,
+            "cliente_documento": req.cliente_documento,
+            "monto_pagado": req.monto_pagado,
+            "vuelto": req.vuelto
+        }
         trans_id, correlativo = database.record_sale(session['id'], req.total, cart_items, req.user_id, payment_data)
         return {"success": True, "transaction_id": trans_id, "correlativo": correlativo}
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- MODULO: USUARIOS ---
 @app.get("/usuarios")
@@ -275,6 +414,40 @@ def guardar_usuario(u: UserSchema):
         return {"success": True}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/usuarios/{user_id}")
+def eliminar_usuario(user_id: int):
+    try:
+        # No permitir que el usuario elimine su propio usuario si es el último admin (opcional, pero buena práctica)
+        database.delete_user(user_id)
+        return {"success": True}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/permisos")
+def listar_permisos_disponibles():
+    try: return [dict(p) for p in database.get_all_permissions()]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/usuarios/{user_id}/permisos")
+def obtener_permisos_usuario(user_id: int):
+    try:
+        # Obtener los nombres de los permisos
+        perm_names = database.get_user_permissions(user_id)
+        # También necesitamos los IDs para que el checkbox funcione en el frontend
+        conn = database.get_connection()
+        res = conn.execute("""
+            SELECT permission_id FROM user_permissions WHERE user_id = ?
+        """, (user_id,)).fetchall()
+        conn.close()
+        return {"names": list(perm_names), "ids": [r[0] for r in res]}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/usuarios/{user_id}/permisos")
+def actualizar_permisos_usuario(user_id: int, perm_ids: list[int]):
+    try:
+        database.update_user_permissions(user_id, perm_ids)
+        return {"success": True}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/login")
 def login(req: LoginRequest):
     try:
@@ -289,13 +462,87 @@ def login(req: LoginRequest):
 def obtener_dashboard():
     try:
         stats = database.get_dashboard_stats()
-        low_stock = database.get_report_low_stock()
-        return {"sales_today": stats['sales_today'], "total_clients": stats['total_clients'], "total_products": stats['total_products'], "alerta_stock": len(low_stock)}
+        return {
+            "sales_today": stats['sales_today'], 
+            "methods_today": stats['methods_today'],
+            "total_clients_today": stats['total_clients_today'], 
+            "alerta_stock": stats['alerta_stock']
+        }
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reportes/hoy/clientes")
+def report_hoy_clientes():
+    try: return [dict(r) for r in database.get_today_clients_details()]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reportes/hoy/productos")
+def report_hoy_productos():
+    try: return [dict(r) for r in database.get_today_products_details()]
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/reportes/stock-bajo")
 def obtener_stock_bajo():
     try: return [dict(r) for r in database.get_report_low_stock()]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reportes/ventas-rango")
+def report_ventas_rango(inicio: str, fin: str, metodo_pago: str = "TODOS"):
+    try: return database.get_report_sales_by_range_filtered(inicio, fin, metodo_pago)
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reportes/ventas-por-producto")
+def report_ventas_producto(inicio: str, fin: str, metodo_pago: str = "TODOS"):
+    try: return [dict(r) for r in database.get_report_sales_by_product_filtered(inicio, fin, metodo_pago)]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reportes/ventas-por-categoria")
+def report_ventas_categoria(inicio: str, fin: str, metodo_pago: str = "TODOS"):
+    try: return [dict(r) for r in database.get_report_sales_by_category(inicio, fin, metodo_pago)]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reportes/ventas-por-categoria/detalles")
+def report_ventas_categoria_detalles(categoria: str, inicio: str, fin: str):
+    try: return [dict(r) for r in database.get_report_sales_by_category_details(categoria, inicio, fin)]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reportes/ventas-por-cliente")
+def report_ventas_cliente(inicio: str, fin: str):
+    try: return [dict(r) for r in database.get_report_sales_by_customer(inicio, fin)]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reportes/productos-por-cliente")
+def report_productos_cliente(documento: str, inicio: str | None = None, fin: str | None = None):
+    try: return [dict(r) for r in database.get_customer_product_sales(documento, inicio, fin)]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reportes/clientes-por-producto")
+def report_clientes_producto(codigo: str, inicio: str | None = None, fin: str | None = None):
+    try: return [dict(r) for r in database.get_product_customer_sales(codigo, inicio, fin)]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reportes/top-productos")
+def report_top_productos(limit: int = 10):
+    try: return [dict(r) for r in database.get_report_top_products(limit)]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reportes/vendedores")
+def report_vendedores():
+    try: return [dict(r) for r in database.get_report_sales_by_seller()]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reportes/utilidades")
+def report_utilidades(inicio: str, fin: str):
+    try: return [dict(r) for r in database.get_profitability_report(inicio, fin)]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reportes/kardex")
+def report_kardex():
+    try: return [dict(r) for r in database.get_report_kardex()]
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/productos/{codigo}/kardex")
+def obtener_kardex_producto(codigo: str):
+    try: return database.get_product_kardex(codigo)
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/reportes/historial-ventas")
@@ -311,6 +558,34 @@ def obtener_historial_ventas(inicio: str | None = None, fin: str | None = None):
         conn.close(); return ventas
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
 
+def numero_a_letras(numero):
+    from decimal import Decimal
+    enteros = int(numero)
+    centimos = int(round((numero - enteros) * 100))
+    unidades = ["", "UN", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"]
+    decenas = ["", "DIEZ", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"]
+    especiales = {11: "ONCE", 12: "DOCE", 13: "TRECE", 14: "CATORCE", 15: "QUINCE", 16: "DIECISEIS", 17: "DIECISIETE", 18: "DIECIOCHO", 19: "DIECINUEVE"}
+    centenas = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"]
+    def convertir_grupo(n):
+        if n == 100: return "CIEN"
+        res = ""
+        c = n // 100; d = (n % 100) // 10; u = n % 10
+        if c > 0: res += centenas[c] + " "
+        if d == 1 and u > 0: res += especiales[d*10 + u]
+        else:
+            if d > 0: 
+                res += decenas[d]
+                if u > 0: res += " Y "
+            if u > 0: res += unidades[u]
+        return res.strip()
+    if enteros == 0: texto = "CERO"
+    elif enteros < 1000: texto = convertir_grupo(enteros)
+    else:
+        mif = enteros // 1000; resto = enteros % 1000
+        prefijo = "MIL" if mif == 1 else convertir_grupo(mif) + " MIL"
+        texto = f"{prefijo} {convertir_grupo(resto)}"
+    return f"SON: {texto.strip()} CON {str(centimos).zfill(2)}/100 SOLES"
+
 # --- MODULO: RECIBOS ---
 @app.get("/ventas/{id}/ticket")
 def obtener_ticket_html(id: int, format: str = "80mm"):
@@ -318,6 +593,8 @@ def obtener_ticket_html(id: int, format: str = "80mm"):
         sale_raw, items = database.get_sale_full_details(id)
         if not sale_raw: raise HTTPException(status_code=404, detail="No encontrada")
         sale = dict(sale_raw); items_list = [dict(item) for item in items]; is_a4 = format.upper() == "A4"
+        seller_name = sale.get('seller_name') or "ADMINISTRADOR"
+        monto_letras = numero_a_letras(sale['total'])
         st_b = "color: #000000 !important; -webkit-text-fill-color: #000000 !important; opacity: 1 !important; font-weight: 900 !important;"
         reset_st = "* { background-color: #ffffff !important; color: #000000 !important; -webkit-print-color-adjust: exact !important; }"
         if is_a4:
@@ -333,11 +610,9 @@ def obtener_ticket_html(id: int, format: str = "80mm"):
             for i, item in enumerate(items_list):
                 sub = item['quantity'] * item['unit_price']; desc = f"{item['nombre']} ({item['unidad_venta']})" if item.get('unidad_venta') else item['nombre']; bg = "#f8fafc" if i % 2 != 0 else "#ffffff"
                 html += f"<tr style='background-color: {bg} !important;'><td style='padding: 12px; border-bottom: 1px solid #000; text-align: center; {st_b}'>{str(i+1).zfill(2)}</td><td style='padding: 12px; border-bottom: 1px solid #000; {st_b}'>{desc}</td><td style='padding: 12px; border-bottom: 1px solid #000; text-align: right; {st_b}'>{item['unit_price']:,.2f}</td><td style='padding: 12px; border-bottom: 1px solid #000; text-align: center; {st_b}'>{item['quantity']}</td><td style='padding: 12px; border-bottom: 1px solid #000; text-align: right; {st_b}'>{sub:,.2f}</td></tr>"
-            subtotal = sale['total'] / 1.18; igv = sale['total'] - subtotal
             html += f"""</tbody></table><div style="display: flex; flex-direction: column; align-items: flex-end; margin-top: 30px;"><div style="font-size: 32px; font-weight: 900; color: {primary_teal} !important; padding-top: 20px;">TOTAL: S/ {sale['total']:,.2f}</div></div></div><script>window.onload = function() {{ if(!window.location.search.includes('no_print')) setTimeout(() => {{ window.print(); }}, 500); }}</script></body></html>"""
             return HTMLResponse(content=html)
         else:
-            # TICKET 80mm
             st_t = "color: #000000 !important; background-color: #ffffff !important; font-family: 'Courier New', Courier, monospace !important; font-size: 10px; font-weight: 900 !important;"
             html = f"""<html><head><meta charset="UTF-8"><meta name="color-scheme" content="light"><style>{reset_st} @media print {{ .no-print {{ display: none !important; }} }} body {{ width: 275px; margin: 0 auto; }}</style></head>
             <body style="padding: 10px; {st_t} background-color: #ffffff !important;">
@@ -357,6 +632,13 @@ def obtener_ticket_html(id: int, format: str = "80mm"):
             html += f"""<div style="border-top: 1.5px solid #000 !important; margin: 10px 0 5px 0; padding-top: 5px; text-align: right;"><strong style="font-size: 16px; {st_b}">TOTAL: S/ {sale['total']:,.2f}</strong></div><div style="text-align: center; margin-top: 30px; {st_b} font-size: 11px;">¡GRACIAS POR SU COMPRA!</div></div><script>window.onload = function() {{ if(!window.location.search.includes('no_print')) setTimeout(() => {{ window.print(); }}, 500); }}</script></body></html>"""
             return HTMLResponse(content=html)
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+# --- SERVIR FRONTEND ---
+try:
+    frontend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'pagina_web'))
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="static")
+except Exception as e:
+    print(f"Advertencia: No se pudo montar la carpeta estática: {e}")
 
 if __name__ == "__main__":
     import uvicorn

@@ -3,6 +3,46 @@ const API_URL = "http://127.0.0.1:8000";
 
 // --- UTILIDADES ---
 
+function showToast(message, type = 'info') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    let icon = 'info-circle';
+    if (type === 'success') icon = 'check-circle';
+    if (type === 'error') icon = 'exclamation-circle';
+    if (type === 'warning') icon = 'exclamation-triangle';
+
+    toast.innerHTML = `
+        <i class="fas fa-${icon}"></i>
+        <span>${message}</span>
+    `;
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            container.removeChild(toast);
+        }, 300);
+    }, 4000);
+}
+
+// Reemplazar alert con toast donde sea posible
+const notify = {
+    success: (msg) => showToast(msg, 'success'),
+    error: (msg) => showToast(msg, 'error'),
+    warn: (msg) => showToast(msg, 'warning'),
+    info: (msg) => showToast(msg, 'info')
+};
+
 // --- UTILIDADES DE IMPRESIÓN Y PDF ---
 
 async function descargarPDF(id, formato = '80mm') {

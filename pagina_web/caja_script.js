@@ -4,6 +4,7 @@ let currentSession = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     updateSessionStatus();
+    setupMovementForm();
 });
 
 async function updateSessionStatus() {
@@ -16,26 +17,28 @@ async function updateSessionStatus() {
         if (data.active) {
             currentSession = data.session;
             const startDate = new Date(currentSession.open_date).toLocaleString();
-            statusBar.innerHTML = `🟢 ESTADO: CAJA ABIERTA | Inicio: ${startDate}`;
-            statusBar.style.color = '#10b981';
+            statusBar.innerHTML = `<span class="badge badge-green" style="font-size: 14px;"><i class="fas fa-check-circle"></i> CAJA ABIERTA</span> <span style="margin-left: 10px; color: var(--text-muted);">Inicio: ${startDate}</span>`;
             if (closeBtn) {
-                closeBtn.innerText = "Cerrar Caja (Corte Z)";
+                closeBtn.innerHTML = '<i class="fas fa-file-invoice-dollar"></i> CERRAR CAJA (CORTE Z)';
                 closeBtn.onclick = handleCloseCaja;
+                closeBtn.className = "btn btn-danger";
             }
         } else {
             currentSession = null;
-            statusBar.innerHTML = `🔴 ESTADO: CAJA CERRADA`;
-            statusBar.style.color = '#ef4444';
+            statusBar.innerHTML = `<span class="badge badge-red" style="font-size: 14px;"><i class="fas fa-times-circle"></i> CAJA CERRADA</span>`;
             if (closeBtn) {
-                closeBtn.innerText = "Abrir Nueva Caja";
+                closeBtn.innerHTML = '<i class="fas fa-cash-register"></i> ABRIR NUEVA CAJA';
                 closeBtn.onclick = openOpenModal;
+                closeBtn.className = "btn btn-primary";
             }
         }
-    } catch (error) { console.error(error); }
+    } catch (error) { 
+        notify.error("Error al verificar estado de caja");
+    }
 }
 
 async function fetchResumen() {
-    if (!currentSession) return alert("No hay una sesión de caja activa.");
+    if (!currentSession) return notify.warn("No hay una sesión de caja activa.");
     
     try {
         const response = await fetch(`${API_URL}/caja/resumen`);
@@ -47,7 +50,6 @@ async function fetchResumen() {
 
         document.getElementById('txt_inicial').textContent = `S/ ${data.inicial.toFixed(2)}`;
         
-        // Resetear KPIs de métodos de pago
         let vEfectivo = 0, vYape = 0, vTransf = 0;
         const totalVentas = Object.values(data.ventas).reduce((a, b) => a + b, 0);
         document.getElementById('txt_ventas').textContent = `S/ ${totalVentas.toFixed(2)}`;
@@ -63,17 +65,16 @@ async function fetchResumen() {
             else {
                 const div = document.createElement('div');
                 div.className = "summary-item";
+                div.style = "display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid var(--border-color);";
                 div.innerHTML = `<span>${metodo}</span> <strong>S/ ${monto.toFixed(2)}</strong>`;
                 listVentas.appendChild(div);
             }
         }
 
-        // Asignar a tarjetas principales
         document.getElementById('txt_v_efectivo').textContent = `S/ ${vEfectivo.toFixed(2)}`;
         document.getElementById('txt_v_yape').textContent = `S/ ${vYape.toFixed(2)}`;
         document.getElementById('txt_v_transf').textContent = `S/ ${vTransf.toFixed(2)}`;
         
-        // Efectivo en Caja = Inicial + Ventas Efectivo + Ingresos Manuales - Retiros Manuales
         const movNeto = (data.movimientos['INGRESO'] || 0) - (data.movimientos['RETIRO'] || 0);
         const efectivoCaja = data.inicial + vEfectivo + movNeto;
         document.getElementById('txt_efectivo_caja').textContent = `S/ ${efectivoCaja.toFixed(2)}`;
@@ -83,14 +84,19 @@ async function fetchResumen() {
         for (const [tipo, monto] of Object.entries(data.movimientos)) {
             const div = document.createElement('div');
             div.className = "summary-item";
-            div.innerHTML = `<span style="color: ${tipo === 'INGRESO' ? '#22c55e' : '#ef4444'};">${tipo}</span> <strong>S/ ${monto.toFixed(2)}</strong>`;
+            div.style = "display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid var(--border-color);";
+            div.innerHTML = `<span style="color: ${tipo === 'INGRESO' ? 'var(--success)' : 'var(--danger)'}; font-weight: 600;">${tipo}</span> <strong>S/ ${monto.toFixed(2)}</strong>`;
             listMov.appendChild(div);
         }
-    } catch (error) { console.error(error); }
+        
+        notify.info("Resumen de caja actualizado");
+    } catch (error) { 
+        notify.error("Error al cargar el resumen");
+    }
 }
 
 async function handleCloseCaja() {
-    if (!confirm("¿Estás seguro de que deseas cerrar la caja y realizar el Corte Z?")) return;
+    if (!confirm("¿Estás seguro de que deseas cerrar la caja? Se generará el respaldo automático.")) return;
 
     try {
         const user = getLoggedInUser();
@@ -101,13 +107,13 @@ async function handleCloseCaja() {
         });
 
         if (response.ok) {
-            alert("Caja cerrada correctamente. Se ha generado el Corte Z.");
-            location.reload();
+            notify.success("Caja cerrada correctamente");
+            setTimeout(() => location.reload(), 1500);
         } else {
             const err = await response.json();
-            alert("Error: " + err.detail);
+            notify.error("Error: " + (err.detail || "No se pudo cerrar la caja"));
         }
-    } catch (error) { alert("Error de conexión"); }
+    } catch (error) { notify.error("Error de conexión"); }
 }
 
 function openOpenModal() {
@@ -131,13 +137,14 @@ async function confirmOpenCaja() {
         });
 
         if (response.ok) {
-            alert("¡Caja abierta exitosamente!");
-            location.reload();
+            notify.success("¡Caja abierta exitosamente!");
+            closeOpenModal();
+            setTimeout(() => location.reload(), 1000);
         } else {
             const err = await response.json();
-            alert("Error: " + err.detail);
+            notify.error("Error: " + (err.detail || "No se pudo abrir la caja"));
         }
-    } catch (error) { alert("Error de conexión"); }
+    } catch (error) { notify.error("Error de conexión"); }
 }
 
 async function loadHistory() {
@@ -149,25 +156,24 @@ async function loadHistory() {
         document.getElementById('summary_content').style.display = 'none';
         document.getElementById('history_content').style.display = 'block';
 
-        const tbody = document.getElementById('history_tbody');
-        tbody.innerHTML = "";
-        history.reverse().forEach(h => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${new Date(h.open_date).toLocaleString()}</td>
-                <td>${h.close_date ? new Date(h.close_date).toLocaleString() : '---'}</td>
-                <td>S/ ${h.initial_fund.toFixed(2)}</td>
-                <td>S/ ${h.total_sales.toFixed(2)}</td>
-                <td><span class="stock-badge ${h.status === 'OPEN' ? '' : 'stock-low'}">${h.status}</span></td>
-            `;
-            tbody.appendChild(tr);
-        });
-    } catch (error) { console.error(error); }
+        const columns = [
+            { key: 'open_date', formatter: val => new Date(val).toLocaleString() },
+            { key: 'close_date', formatter: val => val ? new Date(val).toLocaleString() : '<span class="badge badge-green">ACTIVA</span>' },
+            { key: 'initial_fund', formatter: val => `S/ ${val.toFixed(2)}` },
+            { key: 'total_sales', formatter: val => `S/ ${val.toFixed(2)}` },
+            { 
+                key: 'status', 
+                formatter: val => `<span class="stock-badge ${val === 'OPEN' ? 'stock-ok' : 'stock-low'}">${val === 'OPEN' ? 'ABIERTA' : 'CERRADA'}</span>` 
+            }
+        ];
+
+        renderTable(history.reverse(), columns, 'history_tbody');
+        notify.info("Historial cargado");
+    } catch (error) { notify.error("Error al cargar historial"); }
 }
 
-// --- Movimientos Manuales ---
 function openMovementModal(tipo) {
-    if (!currentSession) return alert("Debes abrir la caja primero");
+    if (!currentSession) return notify.warn("Debes abrir la caja primero");
     document.getElementById('mov_tipo').value = tipo;
     document.getElementById('mov_title').textContent = tipo === 'INGRESO' ? "Nuevo Ingreso Manual" : "Nuevo Retiro Manual";
     document.getElementById('movement_form').reset();
@@ -178,30 +184,39 @@ function closeMovementModal() {
     document.getElementById('movement_modal').style.display = "none";
 }
 
-document.getElementById('movement_form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const user = getLoggedInUser();
-    const movData = {
-        user_id: user.id,
-        tipo: document.getElementById('mov_tipo').value,
-        monto: parseFloat(document.getElementById('mov_monto').value),
-        descripcion: document.getElementById('mov_desc').value
-    };
+function setupMovementForm() {
+    const form = document.getElementById('movement_form');
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const user = getLoggedInUser();
+            const movData = {
+                user_id: user.id,
+                tipo: document.getElementById('mov_tipo').value,
+                monto: parseFloat(document.getElementById('mov_monto').value),
+                descripcion: document.getElementById('mov_desc').value
+            };
 
-    try {
-        const response = await fetch(`${API_URL}/caja/movimiento`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(movData)
+            if (isNaN(movData.monto) || movData.monto <= 0) {
+                return notify.warn("Ingrese un monto válido");
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/caja/movimiento`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(movData)
+                });
+
+                if (response.ok) {
+                    closeMovementModal();
+                    fetchResumen();
+                    notify.success("Movimiento registrado con éxito");
+                } else {
+                    const err = await response.json();
+                    notify.error("Error: " + (err.detail || "No se pudo registrar"));
+                }
+            } catch (error) { notify.error("Error de conexión"); }
         });
-
-        if (response.ok) {
-            closeMovementModal();
-            fetchResumen();
-            alert("Movimiento registrado");
-        } else {
-            const err = await response.json();
-            alert("Error: " + err.detail);
-        }
-    } catch (error) { alert("Error de conexión"); }
-});
+    }
+}

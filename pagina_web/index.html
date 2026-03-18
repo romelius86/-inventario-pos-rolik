@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventario | ROLIK</title>
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -39,6 +40,7 @@
             </header>
 
             <main class="container">
+                <div id="toast-container"></div>
                 <div class="page-title">
                     <h1>Mis Productos</h1>
                     <div class="actions" style="display:flex; gap:10px;">
@@ -65,7 +67,8 @@
                                     <th>Proveedor</th>
                                     <th style="text-align: center;">Stock</th>
                                     <th style="text-align: center;">Mínimo</th>
-                                    <th>Precio</th>
+                                    <th>Precio Compra</th>
+                                    <th>Precio Venta</th>
                                     <th>Valor Total</th>
                                     <th>Acciones</th>
                                 </tr>
@@ -109,13 +112,15 @@
                         <label>Unidad de Medida</label>
                         <input type="text" id="p_unidad" list="unidades_list" placeholder="Ej: Unidad (und)">
                         <datalist id="unidades_list">
-                            <option value="Unidad (und)">
-                            <option value="Kilogramo (kg)">
-                            <option value="Metro (m)">
-                            <option value="Bolsa">
-                            <option value="Caja">
-                            <option value="Litro (lt)">
-                            <option value="Paquete (pqt)">
+                            <option value="UNIDAD">
+                            <option value="MILLAR">
+                            <option value="CIENTO">
+                            <option value="DOCENA">
+                            <option value="METRO (m)">
+                            <option value="KILO (kg)">
+                            <option value="BOLSA">
+                            <option value="CAJA">
+                            <option value="PAQUETE">
                         </datalist>
                     </div>
                     <div class="form-group">
@@ -125,6 +130,10 @@
                     <div class="form-group">
                         <label>Stock Mínimo</label>
                         <input type="number" id="p_stock_min" value="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Precio de Compra (S/)</label>
+                        <input type="number" id="p_precio_compra" value="0.00" step="0.01">
                     </div>
                     <div class="form-group">
                         <label>Precio de Venta (S/)</label>
@@ -184,6 +193,34 @@
                         </tr>
                     </thead>
                     <tbody id="units_tbody">
+                        <!-- Se llena vía JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Kardex por Producto -->
+    <div id="kardex_modal" class="modal">
+        <div class="modal-content" style="max-width: 850px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 id="kardex_title">Kardex de Producto</h2>
+                <button onclick="closeKardexModal()" class="btn btn-secondary" style="padding:5px 10px;">&times;</button>
+            </div>
+            
+            <div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Tipo</th>
+                            <th>Documento</th>
+                            <th>Cantidad</th>
+                            <th>Precio</th>
+                            <th>Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody id="kardex_tbody">
                         <!-- Se llena vía JS -->
                     </tbody>
                 </table>

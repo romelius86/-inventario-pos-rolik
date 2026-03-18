@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reportes | ROLIK</title>
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
     <style>
@@ -119,7 +120,7 @@
                 </div>
             </header>
 
-            <main class="container">
+            <main class="container"><div id="toast-container"></div>
                 <!-- MENÚ DE REPORTES (Vista Principal) -->
                 <div id="view_menu" class="report-view active-view">
                     <div class="report-menu">
@@ -226,6 +227,7 @@
                             <option value="TICKET">TICKET</option>
                             <option value="BOLETA">BOLETA</option>
                             <option value="FACTURA">FACTURA</option>
+                            <option value="NOTA DE VENTA">NOTA DE VENTA</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -259,8 +261,128 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Modal Detalle Cliente Productos -->
+    <div id="customer_products_modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 id="cp_modal_title">Productos Comprados por Cliente</h2>
+                <button onclick="closeCustomerProductsModal()" class="btn-secondary" style="padding:5px 10px;">&times;</button>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th style="text-align: center;">Cant. Total</th>
+                            <th style="text-align: right;">Monto Total</th>
+                            <th>Última Compra</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cp_tbody">
+                        <!-- Se llena vía JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ranking Clientes por Producto -->
+    <div id="product_customers_modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 id="pc_modal_title">Clientes que compraron este producto</h2>
+                <button onclick="closeProductCustomersModal()" class="btn-secondary" style="padding:5px 10px;">&times;</button>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th style="text-align: center;">Cant. Comprada</th>
+                            <th style="text-align: right;">Monto Total</th>
+                            <th>Última Compra</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pc_tbody">
+                        <!-- Se llena vía JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Clientes de Hoy -->
+    <div id="today_clients_modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2>Clientes Atendidos Hoy</h2>
+                <button onclick="closeModal('today_clients_modal')" class="btn-secondary" style="padding:5px 10px;">&times;</button>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th style="text-align: center;">Transacciones</th>
+                            <th style="text-align: right;">Total Comprado</th>
+                            <th>Última Hora</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tc_tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Productos de Hoy -->
+    <div id="today_products_modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2>Productos Vendidos Hoy</h2>
+                <button onclick="closeModal('today_products_modal')" class="btn-secondary" style="padding:5px 10px;">&times;</button>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th style="text-align: center;">Cantidad</th>
+                            <th style="text-align: right;">Monto Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tp_tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Productos por Categoría -->
+    <div id="category_products_modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2 id="catp_modal_title">Productos en Categoría</h2>
+                <button onclick="closeModal('category_products_modal')" class="btn-secondary" style="padding:5px 10px;">&times;</button>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th style="text-align: center;">Cantidad</th>
+                            <th style="text-align: right;">Total S/</th>
+                        </tr>
+                    </thead>
+                    <tbody id="catp_tbody">
+                        <!-- Se llena vía JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <script src="common.js"></script>
     <script src="reportes_script.js"></script>
     <script>checkAccess();</script>
 </body>
 </html>
+

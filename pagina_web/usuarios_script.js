@@ -9,7 +9,10 @@ async function fetchUsers() {
         const response = await fetch(`${API_URL}/usuarios`);
         const users = await response.json();
         renderUsers(users);
-    } catch (error) { console.error(error); }
+    } catch (error) { 
+        console.error(error);
+        notify.error("Error al cargar usuarios");
+    }
 }
 
 function renderUsers(users) {
@@ -17,11 +20,17 @@ function renderUsers(users) {
     if (!tbody) return;
     tbody.innerHTML = "";
     
+    const currentUser = getLoggedInUser();
+
     users.forEach(u => {
         const tr = document.createElement('tr');
         // El admin no necesita que le asignen permisos, ya los tiene todos
         const permBtn = u.role !== 'admin' ? 
             `<button class="action-btn" style="background:#3b82f6; color:white;" onclick="openPermissionsModal(${u.id}, '${u.username}')" title="Permisos"><i class="fas fa-key"></i></button>` : '';
+
+        // No permitir que un usuario se elimine a sí mismo
+        const deleteBtn = (currentUser && currentUser.id !== u.id) ?
+            `<button class="action-btn delete-btn" onclick="deleteUser(${u.id}, '${u.username}')" title="Eliminar"><i class="fas fa-trash-alt"></i></button>` : '';
 
         tr.innerHTML = `
             <td><strong style="color: white;">${u.username}</strong></td>
@@ -31,11 +40,32 @@ function renderUsers(users) {
                 <div style="display: flex; gap: 5px;">
                     <button class="action-btn edit-btn" onclick='editUser(${JSON.stringify(u).replace(/'/g, "&apos;")})' title="Editar"><i class="fas fa-user-edit"></i></button>
                     ${permBtn}
+                    ${deleteBtn}
                 </div>
             </td>
         `;
         tbody.appendChild(tr);
     });
+}
+
+async function deleteUser(id, username) {
+    if (!confirm(`¿Estás seguro de eliminar permanentemente al usuario "${username}"?`)) return;
+
+    try {
+        const response = await fetch(`${API_URL}/usuarios/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            notify.success("Usuario eliminado correctamente");
+            fetchUsers();
+        } else {
+            const err = await response.json();
+            notify.error("Error: " + (err.detail || "No se pudo eliminar"));
+        }
+    } catch (error) {
+        notify.error("Error de conexión");
+    }
 }
 
 function openUserModal() {
@@ -93,12 +123,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (response.ok) {
                     closeUserModal();
                     fetchUsers();
-                    alert("Usuario guardado");
+                    notify.success("Usuario guardado correctamente");
                 } else {
                     const err = await response.json();
-                    alert("Error: " + err.detail);
+                    notify.error("Error: " + (err.detail || "No se pudo guardar"));
                 }
-            } catch (error) { alert("Error de conexión"); }
+            } catch (error) { notify.error("Error de conexión"); }
         });
     }
 });
@@ -150,7 +180,7 @@ async function openPermissionsModal(userId, username) {
         document.getElementById('permissions_modal').style.display = "block";
     } catch (error) {
         console.error(error);
-        alert("Error al cargar permisos");
+        notify.error("Error al cargar permisos");
     }
 }
 
@@ -171,13 +201,13 @@ async function saveUserPermissions() {
         });
         
         if (response.ok) {
-            alert("Permisos actualizados correctamente");
+            notify.success("Permisos actualizados correctamente");
             closePermissionsModal();
         } else {
-            alert("Error al guardar permisos");
+            notify.error("Error al guardar permisos");
         }
     } catch (error) {
         console.error(error);
-        alert("Error de conexión");
+        notify.error("Error de conexión");
     }
 }

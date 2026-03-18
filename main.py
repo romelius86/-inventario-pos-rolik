@@ -1651,7 +1651,6 @@ class FinalReceiptScreen(Screen):
 
             <div class="center footer">
                 <div class="line"></div>
-                <p>¡GRACIAS POR SU COMPRA EN ROLIK!</p>
                 <p>Representación impresa de la {self.pay_data['tipo_comprobante'].lower()}</p>
             </div>
         </body>
@@ -1705,8 +1704,6 @@ class FinalReceiptScreen(Screen):
         t += f"{'-'*w}\n"
         t += f"PAGO: {self.pay_data['metodo_pago']} | REC: {self.pay_data['monto_pagado']:.2f}\n"
         t += f"VUELTO: S/ {self.pay_data['vuelto']:.2f}\n"
-        t += f"{'='*w}\n"
-        t += f"{'¡GRACIAS POR SU COMPRA!':^{w}}\n"
         t += f"{'='*w}\n\n\n" # Espacio final para el corte manual
         return t
 
@@ -2586,7 +2583,7 @@ class ViewReceiptDialog(Screen):
             <table><thead><tr><th style="width: 15%;">Cant</th><th style="width: 60%;">Descrip</th><th style="width: 25%; text-align: right;">Total</th></tr></thead><tbody>{items_html}</tbody></table>
             <div class="line"></div><table class="total-table"><tr><td>SUBTOTAL:</td><td style="text-align: right;">S/ {subtotal:.2f}</td></tr><tr><td>IGV (18%):</td><td style="text-align: right;">S/ {igv:.2f}</td></tr><tr class="bold" style="font-size: 14px;"><td>TOTAL:</td><td style="text-align: right;">S/ {self.sale_dict['total']:.2f}</td></tr></table>
             <div style="clear: both; margin-top: 10px;"><div><b>Pago:</b> {self.sale_dict['metodo_pago']}</div><div><b>Recibido:</b> S/ {self.sale_dict.get('monto_pagado', 0):.2f}</div><div><b>Vuelto:</b> S/ {self.sale_dict.get('vuelto', 0):.2f}</div></div>
-            <div class="center footer"><div class="line"></div><p>¡GRACIAS POR SU COMPRA EN ROLIK!</p></div></body></html>
+            <div class="center footer"><div class="line"></div></div></body></html>
             """
             with open(filename, "w", encoding="utf-8") as f: f.write(html)
             if os.name == 'nt': os.startfile(filename)

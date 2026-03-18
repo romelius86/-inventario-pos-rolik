@@ -5,6 +5,11 @@ let allSuppliers = [];
 document.addEventListener('DOMContentLoaded', () => {
     fetchSuppliers();
     setupFormListener();
+    
+    const searchInput = document.getElementById('supplier_search');
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(() => filterSuppliers(), 300));
+    }
 });
 
 async function fetchSuppliers() {
@@ -12,51 +17,43 @@ async function fetchSuppliers() {
     if (!tbody) return;
     
     try {
-        const response = await fetch(`${API_URL}/proveedores-lista-completa`);
+        const response = await fetch(`${API_URL}/proveedores-detalles`);
         allSuppliers = await response.json();
         renderSuppliers(allSuppliers);
     } catch (error) {
-        console.error(error);
-        tbody.innerHTML = `<tr><td colspan="6" class="loading" style="color: red;">Error de conexión con la API.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="error">Error de conexión con la API.</td></tr>`;
+        notify.error("No se pudieron cargar los proveedores");
     }
 }
 
 function renderSuppliers(suppliers) {
-    const tbody = document.getElementById('suppliers_body');
-    if (!tbody) return;
-    tbody.innerHTML = "";
-    
-    if (suppliers.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="loading">No se encontraron proveedores registrados.</td></tr>`;
-        return;
-    }
-
-    suppliers.forEach(s => {
-        const tr = document.createElement('tr');
-        
-        let actionsHtml = `<div style="display: flex; gap: 5px;">`;
-        if (hasPermission('product.edit')) { 
-            actionsHtml += `<button class="action-btn edit-btn" onclick="openSupplierModal(${s.id})" title="Editar"><i class="fas fa-edit"></i></button>`;
+    const columns = [
+        { key: 'nombre', formatter: val => `<strong>${val}</strong>` },
+        { key: 'ruc_dni', formatter: val => `<code>${val || '-'}</code>` },
+        { key: 'telefono', formatter: val => val || '-' },
+        { key: 'email', formatter: val => val || '-' },
+        { key: 'direccion', formatter: val => `<small class="text-muted">${val || '-'}</small>` },
+        { 
+            key: 'id', 
+            label: 'Acciones',
+            formatter: (val, s) => `
+                <div style="display: flex; gap: 5px;">
+                    <button class="action-btn edit-btn" onclick="openSupplierModal(${val})" title="Editar"><i class="fas fa-edit"></i></button>
+                    <button class="action-btn delete-btn" onclick="deleteSupplier(${val}, '${s.nombre.replace(/'/g, "\\'")}')" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            `
         }
-        if (hasPermission('product.delete')) {
-            actionsHtml += `<button class="action-btn delete-btn" onclick="deleteSupplier(${s.id}, '${s.nombre}')" title="Eliminar"><i class="fas fa-trash-alt"></i></button>`;
-        }
-        actionsHtml += `</div>`;
+    ];
 
-        tr.innerHTML = `
-            <td><strong>${s.nombre}</strong></td>
-            <td><code>${s.ruc_dni || '-'}</code></td>
-            <td>${s.telefono || '-'}</td>
-            <td>${s.email || '-'}</td>
-            <td><small style="color: var(--text-muted);">${s.direccion || '-'}</small></td>
-            <td>${actionsHtml}</td>
-        `;
-        tbody.appendChild(tr);
-    });
+    renderTable(suppliers, columns, 'suppliers_body');
 }
 
 function filterSuppliers() {
     const query = document.getElementById('supplier_search').value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (!query) {
+        renderSuppliers(allSuppliers);
+        return;
+    }
     const filtered = allSuppliers.filter(s => {
         const nombre = s.nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const ruc = (s.ruc_dni || "").toLowerCase();
@@ -90,18 +87,31 @@ function closeSupplierModal() {
 }
 
 async function loadSupplierData(id) {
-    try {
-        const response = await fetch(`${API_URL}/proveedores/${id}`);
-        const s = await response.json();
-        
+    const s = allSuppliers.find(sup => sup.id === id);
+    if (s) {
         document.getElementById('s_id').value = s.id;
         document.getElementById('s_nombre').value = s.nombre;
         document.getElementById('s_ruc_dni').value = s.ruc_dni || "";
         document.getElementById('s_telefono').value = s.telefono || "";
         document.getElementById('s_email').value = s.email || "";
-        document.getElementById('s_direccion').value = s.direccion || "";
-    } catch (error) {
-        alert("Error al cargar datos del proveedor");
+        
+        // Seleccionar tipo de documento según longitud
+        const doc = s.ruc_dni || "";
+        const select = document.getElementById('s_tipo_doc');
+        if (doc.length === 8) select.value = "DNI";
+        else if (doc.length === 11) select.value = "RUC";
+        else select.value = "OTROS";
+
+        // Parsear dirección para extraer distrito si existe formato [Distrito] Dirección
+        let dir = s.direccion || "";
+        if (dir.startsWith("[") && dir.includes("]")) {
+            const parts = dir.split("]");
+            document.getElementById('s_distrito').value = parts[0].substring(1).trim();
+            document.getElementById('s_direccion').value = parts[1].trim();
+        } else {
+            document.getElementById('s_distrito').value = "";
+            document.getElementById('s_direccion').value = dir;
+        }
     }
 }
 
@@ -112,22 +122,45 @@ function setupFormListener() {
             e.preventDefault();
             
             const id = document.getElementById('s_id').value;
+            const distrito = document.getElementById('s_distrito').value.trim();
+            const direccionEx = document.getElementById('s_direccion').value.trim();
+            
+            // Combinar distrito y dirección para la DB
+            const direccionCompleta = distrito ? `[${distrito}] ${direccionEx}` : direccionEx;
+
             const supplierData = {
                 nombre: document.getElementById('s_nombre').value,
-                ruc_dni: document.getElementById('s_ruc_dni').value,
+                ruc_dni: document.getElementById('s_ruc_dni').value.trim(),
                 telefono: document.getElementById('s_telefono').value,
                 email: document.getElementById('s_email').value,
-                direccion: document.getElementById('s_direccion').value
+                direccion: direccionCompleta
             };
 
-            try {
-                let url = `${API_URL}/proveedores-full`;
-                let method = 'POST';
+            if (!supplierData.nombre) {
+                notify.warn("El nombre es obligatorio");
+                return;
+            }
 
-                if (id) {
-                    url = `${API_URL}/proveedores/${id}`;
-                    method = 'PUT';
-                }
+            // Validación por Tipo de Documento
+            const tipoDoc = document.getElementById('s_tipo_doc').value;
+            const docLen = supplierData.ruc_dni.length;
+
+            if (tipoDoc === "DNI" && docLen !== 8) {
+                notify.error(`El DNI debe tener exactamente 8 dígitos. Ingresado: ${docLen}`);
+                return;
+            }
+            if (tipoDoc === "RUC" && docLen !== 11) {
+                notify.error(`El RUC debe tener exactamente 11 dígitos. Ingresado: ${docLen}`);
+                return;
+            }
+            if (isNaN(supplierData.ruc_dni) && (tipoDoc === "DNI" || tipoDoc === "RUC")) {
+                notify.error("El número de documento debe contener solo dígitos");
+                return;
+            }
+
+            try {
+                const url = id ? `${API_URL}/proveedores/${id}` : `${API_URL}/proveedores`;
+                const method = id ? 'PUT' : 'POST';
 
                 const response = await fetch(url, {
                     method: method,
@@ -138,20 +171,20 @@ function setupFormListener() {
                 if (response.ok) {
                     closeSupplierModal();
                     fetchSuppliers();
-                    alert("Proveedor guardado correctamente");
+                    notify.success(id ? "Proveedor actualizado" : "Proveedor registrado");
                 } else {
                     const err = await response.json();
-                    alert("Error: " + (err.detail || "No se pudo guardar"));
+                    notify.error("Error: " + (err.detail || "No se pudo guardar"));
                 }
             } catch (error) {
-                alert("Error de conexión con el servidor");
+                notify.error("Error de conexión");
             }
         });
     }
 }
 
 async function deleteSupplier(id, nombre) {
-    if (!confirm(`¿Estás seguro de enviar al proveedor "${nombre}" a la papelera? Podrás restaurarlo durante los próximos días configurados.`)) return;
+    if (!confirm(`¿Estás seguro de enviar al proveedor "${nombre}" a la papelera?`)) return;
 
     try {
         const response = await fetch(`${API_URL}/proveedores/${id}`, {
@@ -160,95 +193,53 @@ async function deleteSupplier(id, nombre) {
 
         if (response.ok) {
             fetchSuppliers();
+            notify.success("Proveedor movido a la papelera");
         } else {
             const err = await response.json();
-            alert("Error: " + (err.detail || "No se pudo eliminar."));
+            notify.error("Error: " + (err.detail || "No se pudo eliminar"));
         }
     } catch (error) {
-        alert("Error de conexión con el servidor.");
+        notify.error("Error de conexión");
     }
 }
 
 async function openTrashModal() {
-    let modal = document.getElementById('trash_modal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'trash_modal';
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 800px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <h2>Papelera de Proveedores</h2>
-                    <button onclick="document.getElementById('trash_modal').style.display='none'" class="btn-secondary" style="padding:5px 10px;">&times;</button>
-                </div>
-
-                <div style="background: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
-                    <span><i class="fas fa-clock"></i> Los proveedores se eliminan permanentemente después de:</span>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <input type="number" id="trash_days_input" style="width: 60px; padding: 5px; border-radius: 4px; border: 1px solid var(--accent-color); background: var(--bg-dark); color: white; text-align: center;">
-                        <span>días</span>
-                        <button onclick="saveTrashSettings()" class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;">GUARDAR</button>
-                    </div>
-                </div>
-
-                <div class="table-responsive">
-                    <table>
-                        <thead>
-                            <tr><th>Nombre</th><th>RUC</th><th>Eliminado el</th><th>Acción</th></tr>
-                        </thead>
-                        <tbody id="trash_tbody"></tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-    }
-
+    const modal = document.getElementById('trash_modal');
     try {
-        // Cargar configuración de días
-        const configRes = await fetch(`${API_URL}/configuracion/trash_retention_days`);
-        const config = await configRes.json();
-        document.getElementById('trash_days_input').value = config.value || 3;
-
         const res = await fetch(`${API_URL}/proveedores-eliminados`);
         const suppliers = await res.json();
         const tbody = document.getElementById('trash_tbody');
-        tbody.innerHTML = suppliers.map(s => `
-            <tr>
-                <td><strong>${s.nombre}</strong></td>
-                <td>${s.ruc_dni || 'N/A'}</td>
-                <td><small>${s.deleted_at}</small></td>
-                <td>
-                    <button onclick="restoreSupplier(${s.id})" class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;">
-                        <i class="fas fa-undo"></i> RESTAURAR
-                    </button>
-                </td>
-            </tr>
-        `).join('') || '<tr><td colspan="4" style="text-align:center">La papelera de proveedores está vacía</td></tr>';
+        tbody.innerHTML = "";
+        
+        if (suppliers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;">La papelera está vacía</td></tr>';
+        } else {
+            suppliers.forEach(s => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${s.nombre}</strong></td>
+                    <td><code>${s.ruc_dni || 'N/A'}</code></td>
+                    <td><small>${s.deleted_at}</small></td>
+                    <td>
+                        <button onclick="restoreSupplier(${s.id})" class="btn btn-primary" style="padding: 5px 10px; font-size: 12px; background: #22c55e;">
+                            <i class="fas fa-undo"></i> RESTAURAR
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
         modal.style.display = 'block';
-    } catch (e) { alert("Error al cargar la papelera"); }
-}
-
-async function saveTrashSettings() {
-    const days = document.getElementById('trash_days_input').value;
-    try {
-        const res = await fetch(`${API_URL}/configuracion`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key: 'trash_retention_days', value: days })
-        });
-        if (res.ok) alert("Configuración guardada. Los cambios aplicarán en la próxima eliminación.");
-    } catch (e) { alert("Error al guardar configuración"); }
+    } catch (e) { notify.error("Error al cargar la papelera"); }
 }
 
 async function restoreSupplier(id) {
     try {
         const res = await fetch(`${API_URL}/proveedores/restaurar/${id}`, { method: 'POST' });
         if (res.ok) {
-            alert("Proveedor restaurado con éxito.");
+            notify.success("Proveedor restaurado con éxito");
             document.getElementById('trash_modal').style.display = 'none';
             fetchSuppliers();
-        } else { alert("No se pudo restaurar el proveedor."); }
-    } catch (e) { alert("Error de conexión"); }
+        } else { notify.error("No se pudo restaurar el proveedor"); }
+    } catch (e) { notify.error("Error de conexión"); }
 }
-

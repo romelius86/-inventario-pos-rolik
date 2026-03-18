@@ -295,14 +295,17 @@
                 <!-- Columna Izquierda: Documentos y Métodos -->
                 <div style="background: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #334155;">
                     <label class="checkout-label">Tipo de Comprobante:</label>
-                    <div class="btn-group" id="group_comprobante" style="margin-bottom: 15px;">
-                        <button class="toggle-btn active" onclick="setComprobante('BOLETA')">BOLETA</button>
-                        <button class="toggle-btn" onclick="setComprobante('FACTURA')">FACTURA</button>
-                        <button class="toggle-btn" onclick="setComprobante('TICKET')">TICKET</button>
-                    </div>
-                    
-                    <label class="checkout-label">Método de Pago:</label>
-                    <div class="btn-group" id="group_metodo">
+                    <select id="chk_tipo_doc" onchange="actualizarTipoComprobante(this.value)" 
+                            style="width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 8px; font-weight: bold; margin-bottom: 15px; cursor: pointer; outline: none;">
+                        <option value="NOTA DE VENTA">NOTA DE VENTA (Descuenta Stock)</option>
+                        <option value="BOLETA">BOLETA (Descuenta Stock)</option>
+                        <option value="FACTURA">FACTURA (Descuenta Stock)</option>
+                        <option value="TICKET">TICKET (Descuenta Stock)</option>
+                        <option value="PROFORMA">PROFORMA (Informativo)</option>
+                        <option value="COTIZACION">COTIZACIÓN (Informativo)</option>
+                    </select>
+
+                    <label class="checkout-label">Método de Pago:</label>                    <div class="btn-group" id="group_metodo">
                         <button class="toggle-btn active" onclick="setMetodo('EFECTIVO')">EFECTIVO</button>
                         <button class="toggle-btn" onclick="setMetodo('TRANSFERENCIA')">TRANSF.</button>
                         <button class="toggle-btn" onclick="setMetodo('YAPE/PLIN')">YAPE</button>

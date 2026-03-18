@@ -1,12 +1,32 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+venv/
+ENV/
+.env
+
+# SQLite / Base de Datos
+*.db
+*.db-journal
+*.db-wal
+backups_sistema/
+
+# Carpetas de Construcción (Windows Executable)
 build/
 dist/
-*.db
 *.spec
-.gemini/
-ventas/
-reportes/*.xlsx
-servidor_api/backups_sistema/
-*.zip
+
+# Archivos de Sistema / Logs
 *.log
+*.tmp
+temp_func.py
+
+# Archivos específicos de Windows
+*.bat
+*.txt
+
+# Archivos de datos locales (Opcional)
+*.csv
+reportes/
+ventas/

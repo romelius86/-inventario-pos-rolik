@@ -19,7 +19,8 @@ from datetime import datetime
 
 # Obtener la ruta absoluta de la carpeta donde está este archivo
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_NAME = os.path.join(BASE_DIR, "erp_system.db")
+# Si existe la variable de entorno DATABASE_PATH, usarla (ideal para Render Disk)
+DB_NAME = os.getenv("DATABASE_PATH", os.path.join(BASE_DIR, "erp_system.db"))
 
 def get_connection():
     """Obtiene una conexión a la base de datos con modo WAL y llaves foráneas habilitadas."""
@@ -46,6 +47,10 @@ def init_db():
             deleted_at TIMESTAMP DEFAULT NULL
         )
     ''')
+    # Crear índice único para RUC si no existe (para soportar ON CONFLICT)
+    try:
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_supplier_ruc ON suppliers(ruc_dni)")
+    except sqlite3.OperationalError: pass
 
     # Añadir columnas a suppliers si no existen
     for col, col_type in [("ruc_dni", "TEXT"), ("direccion", "TEXT"), ("telefono", "TEXT"), ("email", "TEXT"), ("deleted_at", "TIMESTAMP DEFAULT NULL")]:
@@ -66,9 +71,9 @@ def init_db():
             precio_compra REAL DEFAULT 0.0, -- Último precio de compra
             costo_promedio REAL DEFAULT 0.0, -- Valor contable calculado
             unidad TEXT,
-            stock_actual INTEGER DEFAULT 0,
-            stock_minimo INTEGER DEFAULT 5,
-            stock_maximo INTEGER DEFAULT 100,
+            stock_actual REAL DEFAULT 0.0,
+            stock_minimo REAL DEFAULT 5.0,
+            stock_maximo REAL DEFAULT 100.0,
             proveedor_id INTEGER,
             fecha_ingreso TIMESTAMP,
             deleted_at TIMESTAMP DEFAULT NULL,
@@ -79,8 +84,8 @@ def init_db():
     # Asegurar que todas las columnas necesarias existan (Migración forzada)
     columnas_necesarias = [
         ("codigo", "TEXT UNIQUE"),
-        ("stock_actual", "INTEGER DEFAULT 0"),
-        ("stock_maximo", "INTEGER DEFAULT 100"),
+        ("stock_actual", "REAL DEFAULT 0.0"),
+        ("stock_maximo", "REAL DEFAULT 100.0"),
         ("costo_promedio", "REAL DEFAULT 0.0"),
         ("fecha_actualizacion_precio", "TIMESTAMP"),
         ("unidad", "TEXT DEFAULT 'Und'"),
@@ -99,6 +104,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS purchase_orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             numero_oc TEXT UNIQUE,
+            comprobante_proveedor TEXT, -- Nueva columna para Guía o Factura del proveedor
             proveedor_id INTEGER,
             fecha_pedido TIMESTAMP ,
             fecha_llegada TIMESTAMP,
@@ -117,7 +123,7 @@ def init_db():
 
     # Añadir nuevas columnas a purchase_orders si no existen
     new_po_cols = [
-        ("numero_oc", "TEXT UNIQUE"), ("fecha_estimada", "DATE"), 
+        ("numero_oc", "TEXT UNIQUE"), ("comprobante_proveedor", "TEXT"), ("fecha_estimada", "DATE"), 
         ("condicion_pago", "TEXT"), ("lugar_entrega", "TEXT"), 
         ("responsable_recibe", "TEXT"), ("tipo_entrega", "TEXT"), 
         ("subtotal", "REAL DEFAULT 0.0"), ("igv", "REAL DEFAULT 0.0"), 
@@ -397,10 +403,10 @@ def get_report_sales_by_range_filtered(start_date, end_date, payment_method=None
     conn = get_connection()
     query_resumen = """
         SELECT 
-            SUM(t.total) as ingresos_brutos,
-            SUM(t.total / 1.18 * 0.18) as total_igv,
-            SUM(t.total / 1.18) as total_neto,
-            SUM((td.unit_price - p.precio_compra) * td.quantity) as ganancia_estimada
+            COALESCE(SUM(t.total), 0) as ingresos_brutos,
+            COALESCE(SUM(t.total / 1.18 * 0.18), 0) as total_igv,
+            COALESCE(SUM(t.total / 1.18), 0) as total_neto,
+            COALESCE(SUM((td.unit_price - p.precio_compra) * td.quantity), 0) as ganancia_estimada
         FROM transactions t
         JOIN transaction_details td ON t.id = td.transaction_id
         JOIN products p ON td.producto_codigo = p.codigo
@@ -461,6 +467,30 @@ def get_report_sales_by_product_filtered(start_date, end_date, payment_method=No
     conn.close()
     return res
 
+def get_product_customer_sales(codigo, start_date=None, end_date=None):
+    """Obtiene los clientes que han comprado un producto específico, ordenados por cantidad descendente."""
+    conn = get_connection()
+    query = """
+        SELECT 
+            t.cliente_nombre as cliente_nombre,
+            t.cliente_documento as cliente_documento,
+            SUM(td.quantity) as cantidad_total,
+            SUM(td.quantity * td.unit_price) as monto_total,
+            MAX(t.date) as ultima_vez_comprado
+        FROM transaction_details td
+        JOIN transactions t ON td.transaction_id = t.id
+        WHERE td.producto_codigo = ? AND t.status != 'VOIDED'
+    """
+    params = [codigo]
+    if start_date and end_date:
+        query += " AND (date(t.date) BETWEEN date(?) AND date(?)) "
+        params.extend([start_date, end_date])
+    
+    query += " GROUP BY t.cliente_documento ORDER BY cantidad_total DESC"
+    res = conn.execute(query, params).fetchall()
+    conn.close()
+    return res
+
 def get_report_sales_by_customer(start_date, end_date):
     """Obtiene el acumulado de compras por cada cliente en un rango de fechas."""
     conn = get_connection()
@@ -478,6 +508,31 @@ def get_report_sales_by_customer(start_date, end_date):
         ORDER BY total_comprado DESC
     """
     res = conn.execute(query, (start_date, end_date)).fetchall()
+    conn.close()
+    return res
+
+def get_customer_product_sales(documento, start_date=None, end_date=None):
+    """Obtiene los productos que ha comprado un cliente específico, ordenados por cantidad descendente."""
+    conn = get_connection()
+    query = """
+        SELECT 
+            p.nombre as producto_nombre,
+            p.codigo as producto_codigo,
+            SUM(td.quantity) as cantidad_total,
+            SUM(td.quantity * td.unit_price) as monto_total,
+            MAX(t.date) as ultima_vez_comprado
+        FROM transaction_details td
+        JOIN products p ON td.producto_codigo = p.codigo
+        JOIN transactions t ON td.transaction_id = t.id
+        WHERE t.cliente_documento = ? AND t.status != 'VOIDED'
+    """
+    params = [documento]
+    if start_date and end_date:
+        query += " AND (date(t.date) BETWEEN date(?) AND date(?)) "
+        params.extend([start_date, end_date])
+    
+    query += " GROUP BY p.codigo ORDER BY cantidad_total DESC"
+    res = conn.execute(query, params).fetchall()
     conn.close()
     return res
 
@@ -617,14 +672,14 @@ def update_supplier(supplier_id, data):
     conn = get_connection()
     try:
         conn.execute("""
-            UPDATE suppliers 
+            UPDATE suppliers
             SET nombre = ?, ruc_dni = ?, direccion = ?, telefono = ?, email = ?
             WHERE id = ?
         """, (
-            data['nombre'].upper(), 
-            data.get('ruc_dni'), 
-            data.get('direccion', '').upper(), 
-            data.get('telefono'), 
+            data['nombre'].upper(),
+            data.get('ruc_dni'),
+            data.get('direccion', '').upper(),
+            data.get('telefono'),
             data.get('email', '').lower(),
             supplier_id
         ))
@@ -636,6 +691,52 @@ def update_supplier(supplier_id, data):
     finally:
         conn.close()
 
+def add_or_update_supplier(data):
+    """Guarda o actualiza la información de un proveedor."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        sup_id = data.get('id')
+        if sup_id:
+            cursor.execute('''
+                UPDATE suppliers
+                SET ruc_dni = ?, nombre = ?, direccion = ?, telefono = ?, email = ?
+                WHERE id = ?
+            ''', (
+                str(data['ruc_dni']),
+                str(data['nombre']).upper(),
+                str(data.get('direccion') or '').upper(),
+                str(data.get('telefono') or ''),
+                str(data.get('email') or '').lower(),
+                sup_id
+            ))
+            if cursor.rowcount > 0:
+                conn.commit()
+                return True
+
+        # Si no hay ID o no se encontró el registro para actualizar, insertar
+        cursor.execute('''
+            INSERT INTO suppliers (ruc_dni, nombre, direccion, telefono, email)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(ruc_dni) DO UPDATE SET
+                nombre=excluded.nombre,
+                direccion=excluded.direccion,
+                telefono=excluded.telefono,
+                email=excluded.email
+        ''', (
+            str(data['ruc_dni']),
+            str(data['nombre']).upper(),
+            str(data.get('direccion') or '').upper(),
+            str(data.get('telefono') or ''),
+            str(data.get('email') or '').lower()
+        ))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error en add_or_update_supplier: {e}")
+        raise e
+    finally:
+        conn.close()
 def delete_supplier(supplier_id):
     """Realiza un borrado lógico (soft delete) del proveedor usando la configuración de días."""
     conn = get_connection()
@@ -733,13 +834,27 @@ def get_all_purchase_orders():
     return orders
 
 def generar_nuevo_numero_oc():
-    """Genera un número de orden correlativo con formato OC-AAAA-0001."""
+    """Genera un número de orden correlativo con formato OC-AAAA-0001, evitando duplicados por eliminación."""
     anio = datetime.now().year
     conn = get_connection()
-    # Contamos cuántas órdenes existen para ese año
-    count = conn.execute("SELECT COUNT(*) FROM purchase_orders WHERE numero_oc LIKE ?", (f"OC-{anio}-%",)).fetchone()[0]
+    # Buscamos el número más alto existente para este año en lugar de solo contar
+    query = "SELECT numero_oc FROM purchase_orders WHERE numero_oc LIKE ? ORDER BY numero_oc DESC LIMIT 1"
+    res = conn.execute(query, (f"OC-{anio}-%",)).fetchone()
     conn.close()
-    return f"OC-{anio}-{(count + 1):04d}"
+    
+    if not res:
+        return f"OC-{anio}-0001"
+    
+    # Extraer el correlativo actual (los últimos 4 dígitos) e incrementar
+    try:
+        ultimo_correlativo = int(res['numero_oc'].split('-')[-1])
+        return f"OC-{anio}-{(ultimo_correlativo + 1):04d}"
+    except (ValueError, IndexError):
+        # Si el formato no coincide, fallar con un conteo de seguridad
+        conn = get_connection()
+        count = conn.execute("SELECT COUNT(*) FROM purchase_orders").fetchone()[0]
+        conn.close()
+        return f"OC-{anio}-{(count + 100):04d}"
 
 def get_purchase_order_details(order_id):
     """Obtiene los detalles (productos) de una orden de compra específica."""
@@ -754,10 +869,11 @@ def get_purchase_order_details(order_id):
     return details
 
 def create_purchase_order(proveedor_nombre, ruc_dni, items, po_data=None):
-    """Crea una nueva orden de compra con validaciones estrictas y cálculos automáticos."""
+    """Crea una nueva orden de compra con validaciones y cálculos automáticos."""
     # VALIDACIONES BÁSICAS
-    if not ruc_dni or not ruc_dni.isdigit() or len(ruc_dni) != 11:
-        raise ValueError("El RUC debe tener exactamente 11 dígitos numéricos.")
+    ruc_dni = str(ruc_dni).strip()
+    if not ruc_dni or not ruc_dni.isdigit() or len(ruc_dni) < 8 or len(ruc_dni) > 11:
+        raise ValueError(f"El RUC/DNI '{ruc_dni}' debe tener entre 8 y 11 dígitos numéricos.")
     
     if not items:
         raise ValueError("No se puede crear una orden sin productos.")
@@ -765,6 +881,12 @@ def create_purchase_order(proveedor_nombre, ruc_dni, items, po_data=None):
     conn = get_connection()
     cursor = conn.cursor()
     try:
+        # 0. Preparar Variables
+        po_data = po_data or {}
+        numero_oc = generar_nuevo_numero_oc()
+        comp_prov = po_data.get('comprobante_proveedor')
+        fecha_compra = po_data.get('fecha_compra') or get_lima_time()
+
         # 1. Gestionar el Proveedor (y su RUC)
         cursor.execute("SELECT id FROM suppliers WHERE nombre = ?", (proveedor_nombre,))
         supplier = cursor.fetchone()
@@ -786,28 +908,24 @@ def create_purchase_order(proveedor_nombre, ruc_dni, items, po_data=None):
                 raise ValueError(f"Cantidad y precio deben ser mayores a cero. Error en item: {item[0]}")
             subtotal += (cant * prec)
         
-        igv = round(subtotal * 0.18, 2)
-        total = round(subtotal + igv, 2)
+        total = round(subtotal, 2)
+        subtotal_neto = round(total / 1.18, 2)
+        igv = round(total - subtotal_neto, 2)
 
         # 3. Crear la Orden Principal
-        po_data = po_data or {}
-        numero_oc = generar_nuevo_numero_oc()
-        
-        # Usar fecha proporcionada o la actual
-        fecha_compra = po_data.get('fecha_compra') or get_lima_time()
-        
+        # ... (en la inserción/actualización se usarán subtotal_neto, igv, total)
         cursor.execute('''
             INSERT INTO purchase_orders (
-                proveedor_id, numero_oc, estado, fecha_pedido, fecha_estimada, condicion_pago, 
+                proveedor_id, numero_oc, comprobante_proveedor, estado, fecha_pedido, fecha_estimada, condicion_pago, 
                 lugar_entrega, responsable_recibe, subtotal, igv, total
-            ) VALUES (?, ?, 'PENDIENTE', ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, 'PENDIENTE', ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            proveedor_id, numero_oc, fecha_compra,
+            proveedor_id, numero_oc, comp_prov, fecha_compra,
             po_data.get('fecha_estimada'), 
             po_data.get('condicion_pago'), 
             po_data.get('lugar_entrega'),
             po_data.get('responsable_recibe'),
-            subtotal, igv, total
+            subtotal_neto, igv, total
         ))
         order_id = cursor.lastrowid
 
@@ -820,6 +938,60 @@ def create_purchase_order(proveedor_nombre, ruc_dni, items, po_data=None):
         
         conn.commit()
         return order_id
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def update_purchase_order(order_id, proveedor_nombre, ruc_dni, items, po_data=None):
+    """Actualiza una orden de compra pendiente (reemplaza items y actualiza cabecera)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # 1. Verificar si está pendiente
+        order = cursor.execute("SELECT estado FROM purchase_orders WHERE id = ?", (order_id,)).fetchone()
+        if not order: raise ValueError("La orden no existe.")
+        if order['estado'] != 'PENDIENTE': raise ValueError("No se puede editar una orden ya recibida.")
+
+        # 2. Gestionar Proveedor
+        cursor.execute("SELECT id FROM suppliers WHERE nombre = ?", (proveedor_nombre,))
+        supplier = cursor.fetchone()
+        if not supplier:
+            cursor.execute("INSERT INTO suppliers (nombre, ruc_dni) VALUES (?, ?)", (proveedor_nombre, ruc_dni))
+            proveedor_id = cursor.lastrowid
+        else:
+            proveedor_id = supplier['id']
+            cursor.execute("UPDATE suppliers SET ruc_dni = ? WHERE id = ?", (ruc_dni, proveedor_id))
+
+        # 3. Cálculos
+        subtotal = 0.0
+        for item in items:
+            subtotal += (float(item[1]) * float(item[2]))
+        igv = 0.0
+        total = round(subtotal, 2)
+
+        # 4. Actualizar Cabecera
+        po_data = po_data or {}
+        fecha_compra = po_data.get('fecha_compra') or get_lima_time()
+        comp_prov = po_data.get('comprobante_proveedor')
+        
+        cursor.execute('''
+            UPDATE purchase_orders SET 
+                proveedor_id = ?, fecha_pedido = ?, comprobante_proveedor = ?, subtotal = ?, igv = ?, total = ?
+            WHERE id = ?
+        ''', (proveedor_id, fecha_compra, comp_prov, subtotal, igv, total, order_id))
+
+        # 5. Reemplazar Detalles
+        cursor.execute("DELETE FROM purchase_order_details WHERE pedido_id = ?", (order_id,))
+        for item in items:
+            cursor.execute("""
+                INSERT INTO purchase_order_details (pedido_id, producto_codigo, cantidad, precio_compra_unitario)
+                VALUES (?, ?, ?, ?)
+            """, (order_id, item[0], item[1], item[2]))
+
+        conn.commit()
+        return True
     except Exception as e:
         conn.rollback()
         raise e
@@ -844,10 +1016,47 @@ def update_purchase_order_status(order_id, new_status):
     cursor = conn.cursor()
     try:
         if new_status == "RECIBIDA":
-            # Si se marca como recibida, actualizar stock automáticamente
             receive_purchase_order(order_id)
+        elif new_status == "REVERTIR":
+            revert_purchase_order(order_id)
         else:
             cursor.execute("UPDATE purchase_orders SET estado = ? WHERE id = ?", (new_status, order_id))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def revert_purchase_order(order_id):
+    """Revierte una orden 'RECIBIDO': descuenta el stock ingresado y la pone en 'PENDIENTE'."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # 1. Verificar que esté recibida
+        order = cursor.execute("SELECT estado FROM purchase_orders WHERE id = ?", (order_id,)).fetchone()
+        if not order or order['estado'] != 'RECIBIDO':
+            raise ValueError("Solo se pueden revertir órdenes en estado RECIBIDO.")
+
+        # 2. Obtener productos para descontar stock
+        details = cursor.execute("SELECT producto_codigo, cantidad FROM purchase_order_details WHERE pedido_id = ?", (order_id,)).fetchall()
+        
+        for item in details:
+            sku = item['producto_codigo']
+            cant = item['cantidad']
+            
+            # Descontar del stock (Validar que no quede en negativo si es necesario, 
+            # aunque en devoluciones de compra se asume que se está corrigiendo un error)
+            cursor.execute("""
+                UPDATE products 
+                SET stock_actual = stock_actual - ?, 
+                    stock = stock - ? 
+                WHERE codigo = ?
+            """, (cant, cant, sku))
+
+        # 3. Regresar a PENDIENTE y limpiar fecha llegada
+        cursor.execute("UPDATE purchase_orders SET estado = 'PENDIENTE', fecha_llegada = NULL WHERE id = ?", (order_id,))
+        
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -923,22 +1132,36 @@ def record_sale(session_id, total, cart_items, user_id, payment_data=None):
     try:
         # 1. Validar Stock y Existencia de Productos antes de cualquier cambio
         tipo_comp = payment_data.get('tipo_comprobante', 'TICKET').upper()
-        
-        if tipo_comp != "PROFORMA":
+        no_discount_types = ["PROFORMA", "COTIZACION", "COTIZACIÓN"]
+
+        if tipo_comp not in no_discount_types:
             for item in cart_items:
-                # item puede ser (codigo, cantidad, precio) o (codigo, cantidad, precio, factor)
+                # item puede ser (codigo, cantidad, precio, factor)
                 codigo = item[0]
                 cantidad = item[1]
-                factor = item[3] if len(item) > 3 else 1.0
-                cantidad_total = cantidad * factor
+                factor_venta = item[3] if len(item) > 3 else 1.0
+                cantidad_solicitada_und = cantidad * factor_venta
                 
-                prod = cursor.execute("SELECT nombre, stock_actual FROM products WHERE codigo = ?", (codigo,)).fetchone()
+                prod = cursor.execute("SELECT nombre, stock_actual, unidad FROM products WHERE codigo = ?", (codigo,)).fetchone()
                 
                 if not prod:
                     raise ValueError(f"El producto con código '{codigo}' no existe.")
                 
-                if prod['stock_actual'] < cantidad_total:
-                    raise ValueError(f"Stock insuficiente para '{prod['nombre']}'. Disponible: {prod['stock_actual']}, Requerido: {cantidad_total}")
+                # Obtener factor de la unidad BASE del producto
+                u_base = (prod['unidad'] or "").upper()
+                f_base = 1.0
+                if "MILLAR" in u_base: f_base = 1000.0
+                elif "CIENTO" in u_base: f_base = 100.0
+                elif "DOCENA" in u_base: f_base = 12.0
+                
+                stock_disponible_und = prod['stock_actual'] * f_base
+                
+                if stock_disponible_und < cantidad_solicitada_und:
+                    # Formatear mensaje para que sea claro
+                    msg_disp = f"{prod['stock_actual']} {prod['unidad']}"
+                    if f_base > 1: msg_disp += f" ({int(stock_disponible_und)} UND)"
+                    
+                    raise ValueError(f"Stock insuficiente para '{prod['nombre']}'. Disponible: {msg_disp}, Requerido: {cantidad_solicitada_und} UND")
 
         # 2. Generar correlativo
         correlativo = generar_correlativo_comprobante(tipo_comp)
@@ -973,18 +1196,52 @@ def record_sale(session_id, total, cart_items, user_id, payment_data=None):
                 VALUES (?, ?, ?, ?, ?)
             """, (transaction_id, item[0], item[1], item[2], u_nombre))
             
-            # SOLO DESCONTAR STOCK SI NO ES PROFORMA
-            if tipo_comp != "PROFORMA":
-                cursor.execute("UPDATE products SET stock = stock - ?, stock_actual = stock_actual - ? WHERE codigo = ?", (cantidad_base, cantidad_base, item[0]))
+            # SOLO DESCONTAR STOCK SI NO ES UN DOCUMENTO INFORMATIVO
+            if tipo_comp not in no_discount_types:
+                # Obtener factor de la unidad BASE del producto para descontar correctamente
+                prod_info = cursor.execute("SELECT unidad FROM products WHERE codigo = ?", (item[0],)).fetchone()
+                u_base_p = (prod_info['unidad'] or "").upper()
+                f_base_p = 1.0
+                if "MILLAR" in u_base_p: f_base_p = 1000.0
+                elif "CIENTO" in u_base_p: f_base_p = 100.0
+                elif "DOCENA" in u_base_p: f_base_p = 12.0
+                
+                # Convertir las unidades vendidas al equivalente en la unidad base (ej: 12 und -> 0.012 millares)
+                descuento_proporcional = cantidad_base / f_base_p
+                
+                cursor.execute("UPDATE products SET stock = stock - ?, stock_actual = stock_actual - ? WHERE codigo = ?", (descuento_proporcional, descuento_proporcional, item[0]))
 
-        # 5. Comisiones (Solo si no es proforma)
-        if tipo_comp != "PROFORMA":
+        # 5. Comisiones (Solo si no es informativo)
+        if tipo_comp not in no_discount_types:
             seller = cursor.execute("SELECT commission_rate FROM users WHERE id = ?", (user_id,)).fetchone()
             if seller and seller['commission_rate'] > 0:
                 cursor.execute("INSERT INTO commissions_earned (user_id, transaction_id, commission_amount) VALUES (?, ?, ?)", (user_id, transaction_id, total * seller['commission_rate']))
             
         conn.commit()
         return transaction_id, correlativo
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def delete_purchase_order(order_id):
+    """Elimina físicamente una orden de compra y sus detalles (solo si está PENDIENTE)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        # 1. Verificar estado
+        order = cursor.execute("SELECT estado FROM purchase_orders WHERE id = ?", (order_id,)).fetchone()
+        if not order: raise ValueError("La orden no existe.")
+        if order['estado'] != 'PENDIENTE':
+            raise ValueError("No se puede eliminar una orden que ya ha sido recibida.")
+
+        # 2. Eliminar detalles y cabecera
+        cursor.execute("DELETE FROM purchase_order_details WHERE pedido_id = ?", (order_id,))
+        cursor.execute("DELETE FROM purchase_orders WHERE id = ?", (order_id,))
+        
+        conn.commit()
+        return True
     except Exception as e:
         conn.rollback()
         raise e
@@ -1173,10 +1430,10 @@ def get_report_sales_by_range(start_date, end_date):
     conn = get_connection()
     query_resumen = """
         SELECT 
-            SUM(t.total) as ingresos_brutos,
-            SUM(t.total / 1.18 * 0.18) as total_igv,
-            SUM(t.total / 1.18) as total_neto,
-            SUM((td.unit_price - p.precio_compra) * td.quantity) as ganancia_estimada
+            COALESCE(SUM(t.total), 0) as ingresos_brutos,
+            COALESCE(SUM(t.total / 1.18 * 0.18), 0) as total_igv,
+            COALESCE(SUM(t.total / 1.18), 0) as total_neto,
+            COALESCE(SUM((td.unit_price - p.precio_compra) * td.quantity), 0) as ganancia_estimada
         FROM transactions t
         JOIN transaction_details td ON t.id = td.transaction_id
         JOIN products p ON td.producto_codigo = p.codigo
@@ -1227,7 +1484,7 @@ def get_report_sales_by_category(start_date, end_date, payment_method=None):
     return res
 
 def get_report_sales_by_category_details(category, start_date, end_date):
-    """Obtiene el detalle de productos vendidos dentro de una categoría específica."""
+    """Obtiene el detalle de productos vendidos dentro de una categoría específica con costos y margen."""
     conn = get_connection()
     query = """
         SELECT 
@@ -1235,18 +1492,21 @@ def get_report_sales_by_category_details(category, start_date, end_date):
             p.nombre,
             SUM(td.quantity) as cant_vendida,
             SUM(td.unit_price * td.quantity) as total_generado,
-            t.metodo_pago,
-            t.date
+            p.precio_compra as costo_unitario,
+            SUM((td.unit_price - p.precio_compra) * td.quantity) as utilidad_item
         FROM transaction_details td
         JOIN products p ON td.producto_codigo = p.codigo
         JOIN transactions t ON td.transaction_id = t.id
         WHERE COALESCE(p.categoria, 'SIN CATEGORÍA') = ?
           AND (date(t.date) BETWEEN date(?) AND date(?))
           AND t.status != 'VOIDED'
-        GROUP BY p.codigo, t.metodo_pago
-        ORDER BY t.date DESC
+        GROUP BY p.codigo
+        ORDER BY utilidad_item ASC
     """
     res = conn.execute(query, (category, start_date, end_date)).fetchall()
+    conn.close()
+    return res
+
     conn.close()
     return res
 
@@ -1329,6 +1589,17 @@ def get_all_customers(search_term=""):
     except Exception:
         conn.close()
         return []
+
+def get_customer(documento):
+    """Obtiene un cliente específico por su documento."""
+    conn = get_connection()
+    try:
+        res = conn.execute("SELECT * FROM customers WHERE documento = ? AND deleted_at IS NULL", (documento,)).fetchone()
+        conn.close()
+        return res
+    except Exception:
+        conn.close()
+        return None
 
 def get_deleted_customers():
     """Obtiene clientes eliminados en los últimos 3 días."""
@@ -1597,10 +1868,11 @@ def get_unit_factor(unidad_nombre):
     """Retorna el factor numérico de una unidad por su nombre."""
     if not unidad_nombre: return 1.0
     u = unidad_nombre.lower().strip()
-    if 'millar' in u: return 1000.0
+    # Priorizar términos más largos para evitar falsos positivos (ej: 'medio millar' vs 'millar')
     if 'medio millar' in u: return 500.0
-    if 'ciento' in u: return 100.0
+    if 'millar' in u: return 1000.0
     if 'medio ciento' in u: return 50.0
+    if 'ciento' in u: return 100.0
     if 'docena' in u: return 12.0
     return 1.0
 
@@ -1735,7 +2007,14 @@ def get_all_products_for_display(search_term: str = "", sort_by: str = "nombre_a
             p.precio_venta, p.precio_compra, p.costo_promedio, p.unidad, 
             p.stock, p.stock_actual, p.stock_minimo, p.stock_maximo, p.fecha_ingreso, 
             s.nombre as proveedor_nombre,
-            (p.stock_actual * p.costo_promedio) as valor_inventario
+            (p.stock_actual * p.precio_venta / 
+                CASE 
+                    WHEN UPPER(p.unidad) LIKE '%MILLAR%' THEN 1000.0
+                    WHEN UPPER(p.unidad) LIKE '%CIENTO%' THEN 100.0
+                    WHEN UPPER(p.unidad) LIKE '%DOCENA%' THEN 12.0
+                    ELSE 1.0 
+                END
+            ) as valor_inventario
         FROM products p
         LEFT JOIN suppliers s ON p.proveedor_id = s.id
         WHERE p.deleted_at IS NULL
@@ -2056,14 +2335,31 @@ def void_sale(transaction_id, authorizing_user_id, reason):
             raise ValueError("La venta ya se encuentra anulada.")
 
         # 2. Devolver Stock al inventario
-        items = cursor.execute("SELECT producto_codigo, quantity FROM transaction_details WHERE transaction_id = ?", (transaction_id,)).fetchall()
+        items = cursor.execute("SELECT producto_codigo, quantity, unidad_venta FROM transaction_details WHERE transaction_id = ?", (transaction_id,)).fetchall()
         for item in items:
+            u_venta = item['unidad_venta']
+            # Si no hay unidad_venta guardada (caso raro de registros antiguos), usar la unidad base del producto
+            if not u_venta:
+                p_info = cursor.execute("SELECT unidad FROM products WHERE codigo = ?", (item['producto_codigo'],)).fetchone()
+                u_venta = p_info['unidad'] if p_info else "UND"
+                
+            # Obtener factor de la unidad con la que se VENDIÓ
+            f_venta = get_unit_factor(u_venta)
+            
+            # Obtener factor de la unidad BASE del producto para devolver proporcionalmente
+            prod_info = cursor.execute("SELECT unidad FROM products WHERE codigo = ?", (item['producto_codigo'],)).fetchone()
+            f_base_p = get_unit_factor(prod_info['unidad'] if prod_info else "UND")
+            
+            # Cantidad total en unidades individuales = cantidad vendida * factor de venta
+            # Cantidad a devolver al stock base = total unidades / factor base del producto
+            devolucion_proporcional = (item['quantity'] * f_venta) / f_base_p
+            
             cursor.execute("""
                 UPDATE products 
                 SET stock = stock + ?, 
                     stock_actual = stock_actual + ? 
                 WHERE codigo = ?
-            """, (item['quantity'], item['quantity'], item['producto_codigo']))
+            """, (devolucion_proporcional, devolucion_proporcional, item['producto_codigo']))
 
         # 3. Anular comisiones generadas por esta venta
         cursor.execute("DELETE FROM commissions_earned WHERE transaction_id = ?", (transaction_id,))
@@ -2128,39 +2424,78 @@ def delete_product_unit(unit_id):
     conn.commit()
     conn.close()
 
+def get_today_clients_details():
+    """Lista de clientes únicos atendidos el día de hoy."""
+    conn = get_connection()
+    hoy = get_lima_time()[:10]
+    query = """
+        SELECT 
+            cliente_nombre, 
+            cliente_documento, 
+            SUM(total) as total_dia,
+            COUNT(id) as transacciones,
+            MAX(date) as hora_ultima
+        FROM transactions 
+        WHERE date(date) = date(?) AND status != 'VOIDED'
+        GROUP BY cliente_documento
+        ORDER BY total_dia DESC
+    """
+    res = conn.execute(query, (hoy,)).fetchall()
+    conn.close()
+    return res
+
+def get_today_products_details():
+    """Desglose de productos vendidos el día de hoy."""
+    conn = get_connection()
+    hoy = get_lima_time()[:10]
+    query = """
+        SELECT 
+            p.nombre,
+            p.codigo,
+            SUM(td.quantity) as cantidad_total,
+            SUM(td.quantity * td.unit_price) as monto_total
+        FROM transaction_details td
+        JOIN transactions t ON td.transaction_id = t.id
+        JOIN products p ON td.producto_codigo = p.codigo
+        WHERE date(t.date) = date(?) AND t.status != 'VOIDED'
+        GROUP BY p.codigo
+        ORDER BY cantidad_total DESC
+    """
+    res = conn.execute(query, (hoy,)).fetchall()
+    conn.close()
+    return res
+
 def get_dashboard_stats():
-    """Calcula estadísticas generales para el dashboard principal incluyendo desglose de pagos."""
+    """Calcula estadísticas generales para el dashboard incluyendo clientes ATENDIDOS hoy."""
     conn = get_connection()
     try:
         hoy = get_lima_time()[:10]
 
-        # 1. Ventas de hoy (Suma de totales de ventas no anuladas)
+        # 1. Ventas de hoy
         res_sales = conn.execute("SELECT SUM(total) FROM transactions WHERE date(date) = date(?) AND status != 'VOIDED'", (hoy,)).fetchone()
         sales_today = res_sales[0] if res_sales and res_sales[0] is not None else 0.0
 
-        # 2. Desglose por método de pago (Hoy)
+        # 2. Desglose por método
         res_methods = conn.execute("""
             SELECT metodo_pago, SUM(total) as total 
             FROM transactions 
             WHERE date(date) = date(?) AND status != 'VOIDED'
             GROUP BY metodo_pago
         """, (hoy,)).fetchall()
-
         methods_today = {row['metodo_pago']: row['total'] for row in res_methods}
 
-        # 3. Total de clientes
-        res_clients = conn.execute("SELECT COUNT(*) FROM customers").fetchone()
-        total_clients = res_clients[0] if res_clients else 0
+        # 3. Clientes ATENDIDOS hoy (Únicos)
+        res_clients_today = conn.execute("SELECT COUNT(DISTINCT cliente_documento) FROM transactions WHERE date(date) = date(?) AND status != 'VOIDED'", (hoy,)).fetchone()
+        clients_today = res_clients_today[0] if res_clients_today else 0
 
-        # 4. Total de productos (SKUs distintos)
-        res_products = conn.execute("SELECT COUNT(*) FROM products").fetchone()
-        total_products = res_products[0] if res_products else 0
-
+        # 4. Total productos alerta
+        res_low = conn.execute("SELECT COUNT(*) FROM products WHERE stock <= stock_minimo AND deleted_at IS NULL").fetchone()
+        
         return {
             "sales_today": sales_today,
             "methods_today": methods_today,
-            "total_clients": total_clients,
-            "total_products": total_products
+            "total_clients_today": clients_today,
+            "alerta_stock": res_low[0] if res_low else 0
         }
     finally:
         conn.close()
