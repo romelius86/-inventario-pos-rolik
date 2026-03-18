@@ -6,8 +6,7 @@ venv/
 ENV/
 .env
 
-# SQLite / Base de Datos
-*.db
+# SQLite / Base de Datos (Render usará SQLite pero no queremos versiones locales si no es necesario, o podemos subirla si es requerida)
 *.db-journal
 *.db-wal
 backups_sistema/
@@ -24,9 +23,13 @@ temp_func.py
 
 # Archivos específicos de Windows
 *.bat
-*.txt
 
 # Archivos de datos locales (Opcional)
 *.csv
 reportes/
 ventas/
+
+# Permitir archivos de configuración para Render
+!requirements.txt
+!runtime.txt
+
