@@ -19,8 +19,7 @@ from datetime import datetime
 
 # Obtener la ruta absoluta de la carpeta donde está este archivo
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Si existe la variable de entorno DATABASE_PATH, usarla (ideal para Render Disk)
-DB_NAME = os.getenv("DATABASE_PATH", os.path.join(BASE_DIR, "erp_system.db"))
+DB_NAME = os.path.join(BASE_DIR, "erp_system.db")
 
 def get_connection():
     """Obtiene una conexión a la base de datos con modo WAL y llaves foráneas habilitadas."""
@@ -65,6 +64,7 @@ def init_db():
             codigo TEXT UNIQUE NOT NULL,
             nombre TEXT NOT NULL,
             fabricante TEXT,
+            marca TEXT,
             categoria TEXT,
             descripcion TEXT,
             precio_venta REAL DEFAULT 0.0,
@@ -84,9 +84,11 @@ def init_db():
     # Asegurar que todas las columnas necesarias existan (Migración forzada)
     columnas_necesarias = [
         ("codigo", "TEXT UNIQUE"),
+        ("marca", "TEXT"),
         ("stock_actual", "REAL DEFAULT 0.0"),
         ("stock_maximo", "REAL DEFAULT 100.0"),
         ("costo_promedio", "REAL DEFAULT 0.0"),
+        ("descripcion", "TEXT"),
         ("fecha_actualizacion_precio", "TIMESTAMP"),
         ("unidad", "TEXT DEFAULT 'Und'"),
         ("deleted_at", "TIMESTAMP DEFAULT NULL")
@@ -1920,13 +1922,14 @@ def add_or_update_product(product_data):
         # ACTUALIZACIÓN (Usamos UPDATE para proteger las llaves foráneas ON DELETE CASCADE)
         cursor.execute('''
             UPDATE products SET 
-                nombre=?, fabricante=?, categoria=?, descripcion=?, precio_venta=?, 
+                nombre=?, fabricante=?, marca=?, categoria=?, descripcion=?, precio_venta=?, 
                 precio_compra=?, unidad=?, stock=?, stock_actual=?, stock_minimo=?, 
                 proveedor_id=?, fecha_actualizacion_precio=?
             WHERE codigo=?
         ''', (
             _clean_value(product_data.get('nombre')), 
             _clean_value(product_data.get('fabricante')),
+            _clean_value(product_data.get('marca')),
             _clean_value(product_data.get('categoria')), 
             _clean_value(product_data.get('descripcion')),
             nuevo_precio_venta, 
@@ -1944,14 +1947,15 @@ def add_or_update_product(product_data):
         fecha_ingreso = product_data.get('fecha_ingreso') or get_lima_time()
         cursor.execute('''
             INSERT INTO products (
-                codigo, nombre, fabricante, categoria, descripcion, precio_venta, 
+                codigo, nombre, fabricante, marca, categoria, descripcion, precio_venta, 
                 precio_compra, unidad, stock, stock_actual, stock_minimo, proveedor_id, 
                 fecha_ingreso, fecha_actualizacion_precio
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             codigo, 
             _clean_value(product_data.get('nombre')), 
             _clean_value(product_data.get('fabricante')),
+            _clean_value(product_data.get('marca')),
             _clean_value(product_data.get('categoria')), 
             _clean_value(product_data.get('descripcion')),
             nuevo_precio_venta, 
@@ -2003,7 +2007,7 @@ def get_all_products_for_display(search_term: str = "", sort_by: str = "nombre_a
 
     base_query = f"""
         SELECT 
-            p.codigo, p.codigo as id, p.codigo as sku, p.nombre, p.categoria, p.fabricante, p.descripcion,
+            p.codigo, p.codigo as id, p.codigo as sku, p.nombre, p.categoria, p.fabricante, p.marca, p.descripcion,
             p.precio_venta, p.precio_compra, p.costo_promedio, p.unidad, 
             p.stock, p.stock_actual, p.stock_minimo, p.stock_maximo, p.fecha_ingreso, 
             s.nombre as proveedor_nombre,
@@ -2045,11 +2049,15 @@ def add_product_from_import(product_data):
     if product_data.get('proveedor'):
         proveedor_id = add_supplier(product_data['proveedor'])
 
+    # Intentar obtener la marca de diferentes posibles nombres de columna
+    marca = product_data.get('Marca') or product_data.get('MARCA') or product_data.get('marca')
+
     # Construir la tupla de datos en el orden correcto
     data_tuple = (
         product_data.get('Codigo'),
         product_data.get('NOMBRE'),
         product_data.get('FABRICANTE'),
+        marca,
         product_data.get('categoria'),
         product_data.get('DESCRIPCIÓN'),
         float(product_data.get('P.Venta articulo', 0.0)),
@@ -2065,9 +2073,9 @@ def add_product_from_import(product_data):
     # Usar INSERT OR REPLACE para añadir o actualizar si el código ya existe
     cursor.execute('''
         INSERT OR REPLACE INTO products (
-            codigo, nombre, fabricante, categoria, descripcion, 
+            codigo, nombre, fabricante, marca, categoria, descripcion, 
             precio_venta, precio_compra, unidad, stock, stock_actual, stock_minimo, proveedor_id, fecha_ingreso
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', data_tuple)
     
     conn.commit()
@@ -2115,6 +2123,7 @@ def add_product_from_flexible_import(product_data):
         "codigo": _clean_value(product_data.get('codigo')),
         "nombre": _clean_value(product_data.get('nombre')),
         "fabricante": _clean_value(product_data.get('fabricante')),
+        "marca": _clean_value(product_data.get('marca') or product_data.get('MARCA')),
         "categoria": _clean_value(product_data.get('categoria')),
         "descripcion": _clean_value(product_data.get('descripcion')),
         "precio_venta": _clean_value(product_data.get('precio_venta'), 'float'),
@@ -2155,7 +2164,7 @@ def bulk_add_products(products):
                     supplier_cache[proveedor_nombre] = proveedor_id
 
             params = (
-                p_data['codigo'], p_data['nombre'], p_data['fabricante'], p_data['categoria'], 
+                p_data['codigo'], p_data['nombre'], p_data['fabricante'], p_data.get('marca'), p_data['categoria'], 
                 p_data['descripcion'], p_data['precio_venta'], p_data['precio_compra'], 
                 p_data['unidad'], p_data['stock'], p_data['stock'], # stock_actual
                 p_data['stock_minimo'], 
@@ -2164,9 +2173,9 @@ def bulk_add_products(products):
 
             cursor.execute('''
                 INSERT OR REPLACE INTO products (
-                    codigo, nombre, fabricante, categoria, descripcion, 
+                    codigo, nombre, fabricante, marca, categoria, descripcion, 
                     precio_venta, precio_compra, unidad, stock, stock_actual, stock_minimo, proveedor_id, fecha_ingreso
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', params)
         
         conn.commit()

@@ -1,35 +1,12 @@
-# Python
 __pycache__/
-*.py[cod]
-*$py.class
-venv/
-ENV/
-.env
-
-# SQLite / Base de Datos (Render usará SQLite pero no queremos versiones locales si no es necesario, o podemos subirla si es requerida)
-*.db-journal
-*.db-wal
-backups_sistema/
-
-# Carpetas de Construcción (Windows Executable)
+*.pyc
 build/
 dist/
+*.db
 *.spec
-
-# Archivos de Sistema / Logs
-*.log
-*.tmp
-temp_func.py
-
-# Archivos específicos de Windows
-*.bat
-
-# Archivos de datos locales (Opcional)
-*.csv
-reportes/
+.gemini/
 ventas/
-
-# Permitir archivos de configuración para Render
-!requirements.txt
-!runtime.txt
-
+reportes/*.xlsx
+servidor_api/backups_sistema/
+*.zip
+*.log

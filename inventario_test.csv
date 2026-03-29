@@ -1,0 +1,971 @@
+Codigo,Nombre,Descripcion,Categoria,Marca,Unidad Base,Presentaciones Adicionales,Proveedor,Stock,Stock Minimo,Precio Compra,Precio Venta
+R_0001," ALICATE PRESION 10.0"" ",ALF-223,Herramienta,,unidad,,ALFA,9,5,8.9,14.0
+R_0005,ABRAZADERA 1 OREJA,,,,DOCENA,unidad (1.0 un.): S/ 0.50 | Docena (12.0 un.): S/ 5.00,NEGOCIACIONES GENERALES CIA,0,5,10.5,20.0
+R_0004,ABRAZADERA OREJA,,,,CIENTO,unidad (1.0 un.): S/ 0.50 | Docena (12.0 un.): S/ 5.00,NEGOCIACIONES GENERALES CIA,37,5,49.0,100.0
+R_0013,ABRAZADERA SIN FIN 1 ,1 GALVANIZADA,,, CIENTO ,,,0,5,14.0,0.0
+R_0016,ABRAZADERA SIN FIN 1/2 ,1/2 GALVANIZADA,,, CIENTO ,,,0,5,20.5,0.0
+R_0017,ABRAZADERA SIN FIN 3/4,3/4 GALVANIZADA,,, CIENTO ,,,0,5,0.85,0.0
+R_0025,"ALCAYATA 2""","2""",,BARCO, CAJA ,,negociaciones generales,0,5,8.5,12.0
+R_0028,ALDABA TROPICALIZADA,"3""",,EL PUMA, DOCENA ,,,0,5,0.0,0.0
+R_0048,ANGULO 8x10 negro,c/Refuerzo negro 8x10,,Gema, docena ,,alfa,0,5,24.0,144.0
+R_0049,ANGULO C/REFUERZO,6X8 NEGRO,,GEMA PERU, DOCENA ,,,0,5,49.6,0.0
+R_0060,ANGULO PESADO 3x3 ,3X3,,EL PUMA, CIENTO ,,,0,5,6.0,130.0
+R_0069,ARANDELA PLANA PESADA ZINCADO,1-Feb,,, KG ,,,0,5,5.5,0.0
+R_0073,ARCODE SIERRA ,,,EUROTOOLS, unidad ,,,0,5,46.0,16.0
+R_0076,ASK09002 WINCHA PLASTICA CINTA METRICA 5M,,,,,,,0,5,0.0,7.0
+R_0002,Abrazadera 1 1/2 tubo agua,"1 1/2, 2 oreja",,El Puma, ciento ,,,0,5,0.0,100.0
+R_0003,Abrazadera 1 1/4 sin fin,galvanizada 1 1/4,,, millar ,,,0,5,50.0,0.0
+R_0006,Abrazadera 1 tubo agua,"1"", 2 oreja",,El Puma, ciento ,,,0,5,8.5,75.0
+R_0007,Abrazadera 1/2 tubo agua,"1/2"", 2 oreja",,El puma, ciento ,,,0,5,35.0,48.0
+R_0008,Abrazadera 2 orejas,3-Abr,,El puma, ciento ,,NEGOCIACIONES GENERALES CIA,0,5,24.0,16.0
+R_0009,Abrazadera 2 tubo agua,"2"",2 oreja",,El Puma, ciento ,,,0,5,8.0,120.0
+R_0011,Abrazadera P/ canaleta,"4"" soporte p/canaleta",,, unidad ,,,0,5,28.0,4.0
+R_0012,Abrazadera P/ canaleta,4 Presion,,, Juego ,,cia,0,5,1.9,25.0
+R_0010,Abrazadera agua 2 orejas,3/4 pesada,,, ciento ,,NEGOCIACIONES GENERALES CIA,0,5,57.5,16.0
+R_0014,Abrazadera sin fin 1 1/2,,,, ciento ,,,0,5,22.0,90.0
+R_0015,Abrazadera sin fin 1 1/4,,,, ciento ,,,0,5,20.5,90.0
+R_0019,Acido 1 L,Antizarro antimanchas,,Derquin,Litro,,,0,5,0.0,6.0
+R_0020,Acido gln,,,,galon,,,0,5,0.0,0.0
+R_0021,Africano 0.76L,terocal,,Adhesivo Nacionales,unidad,,,0,5,0.0,13.0
+R_0022,Africano peque,terocal,,Adhesivo Nacionales,unidad,,,0,5,8.5,2.0
+R_0023,Alcayata 1,,,, caja ,,negociaciones generales,0,5,8.5,0.0
+R_0024,Alcayata 2 1/2,,,, caja ,,negociaciones generales,0,5,8.5,0.0
+R_0026,Alcayata 3,,,, caja ,,negociaciones generales,0,5,0.0,0.0
+R_0027,Alcohol industrial desn,,,Martell,Gl,,,0,5,19.05,18.0
+R_0029,Algod¢n,,,,unidad,,,10,5,0.0,16.0
+R_0031,"Alicate  6""",,,Standard,unidad,,,0,5,10.0,9.5
+R_0030,"Alicate  6""",,Herramienta,,unidad,,,9,5,0.0,8.0
+R_0033,"Alicate 8""",215 g,,economico, unidad ,,ardiles,0,5,8.5,8.0
+R_0032,"Alicate 8""",,Herramienta,,,,,10,5,4.2,14.0
+R_0034,Alicate Pelacable,ALF-0.22,,EUROTOOLS, unidad ,,alfa,0,5,16.0,13.0
+R_0035,Alicate Pelacable pro 7 calibres ALF-022,pelacable 7 calibres,,EUROTOOLS, unidad ,,,0,5,0.0,12.0
+R_0036,Alicate universal 6,,,INGCO, unidad ,,,0,5,0.0,10.0
+R_0037,"Alicate universal 6"" hcp08168","6""",,INGCO, unidad ,,,0,5,0.0,11.5
+R_0038,"Alicate universal 8""",,,INGCO, unidad ,,,0,5,0.0,16.0
+R_0039,"Alicate universal 8""  alf 073","8"" economico",,eurotools, unidad ,,,0,5,0.0,11.0
+R_0040,Alquitran industrial,galon,,derquin,Gl,,,0,5,0.0,20.0
+R_0041,"Angulo 1 1/2"" x 1/2""",,,,,,,0,5,0.0,0.0
+R_0042,"Angulo 1 1/4"" x 1 1/4""",,,,unidad,,,0,5,76.0,0.4
+R_0044,"Angulo 2 1/2"" x 1""",,,,,,,0,5,3.0,0.0
+R_0045,"Angulo 2 1/2""x 1/2""",,,,unidad,,,0,5,0.0,0.8
+R_0046,"Angulo 2"" x 1/2""",,,amarillo,,,,0,5,4.6,0.0
+R_0047,"Angulo 3/4"" x 1""",,,,,,,0,5,76.0,0.0
+R_0058,Angulo Perimetral,drywall,,,,,,0,5,1.7,10.0
+R_0059,Angulo Pesado 2x2,2x2,,El puma, ciento ,,,0,5,20.0,100.0
+R_0050,Angulo cama 2 1/2,,,EL PUMA,JUEGO,,,0,5,0.0,6.0
+R_0051,Angulo cama 3,,,, Juego(4) ,,,0,5,4.0,8.0
+R_0052,Angulo cama 4,,,, Juego(4) ,,,0,5,4.0,9.0
+R_0053,Angulo con refuerzo 8 x 10 negro,negro 8 x 10,,, docena ,,,0,5,59.0,120.0
+R_0054,Angulo doble 4 huecos,40 x 40,,4 huecos, ciento ,,,0,5,86.0,44.0
+R_0055,Angulo doble 4 huecos,50 x 50,,, ciento ,,,0,5,8.6,0.0
+R_0056,Angulo liviano,1 1/2 x 1 1/2,,,,,,0,5,6.0,0.0
+R_0057,Angulo liviano 1 x 1,1 x 1 zincado,,, ciento ,,NEGOCIACIONES GENERALES CIA,0,5,0.0,20.0
+R_0061,"Aplicador Silicona 9""",,,INGCO, unidad ,,,0,5,7.5,13.0
+R_0064,Arandela Neofreno 8,,,,ciento,,,0,5,12.85,7.0
+R_0068,Arandela Pesada 3/8,3/8 zincado,,, kg ,,NEGOCIACIONES GENERALES CIA,0,5,0.0,15.0
+R_0065,Arandela neopreno 10,,,, millar ,,negociaciones generales cia,0,5,15.3,70.0
+R_0067,Arandela pesada 1/4,,,,Kg,,,0,5,5.09,12.0
+R_0070,"Arco de sierra 12""","M/AMARILLO 12""",,PRETUL, unidad ,,,0,5,3.0,18.0
+R_0071,"Arco de sierra 12""",,,INGCO, unidad ,,alfa,0,5,13.9,30.0
+R_0074,Armella C. 1 1/2,,,, ciento ,,alfa,0,5,0.0,25.0
+R_0078,Azufre en polvo,kg,,derquin,,,,0,5,18.0,8.5
+R_0084,BARNIZ ROBLE,PARA MADERA ROBLE,,ISSA, GALON ,,,0,5,0.0,55.0
+R_0102,"BISAGRA FIJA 3""","ALUMINIZADA 3""",,, CAJA ,,,0,5,2.5,26.0
+R_0109,BROCA 3/32,METAL,,WINGS, UNIDAD ,,,0,5,2.6,2.0
+R_0131,"BROCHA 2""",BROCHA DENYLON,,C&A, unidad ,,,0,5,0.0,4.0
+R_0139,BRONCE 1/2,,,, unidad ,,,0,5,0.0,6.0
+R_0079,"Badilejo 7""",m/madera,,C&A, unidad ,,ardiles,0,5,0.0,6.0
+R_0080,Balanza 5Kg,,,, unidad ,,Ferretools,0,5,0.0,20.0
+R_0081,Baldosa vinil 60x60,drywall,,,caja,,,0,5,6.5,55.0
+R_0082,Barniz Marino,,,Issa,GALON,,,0,5,6.5,56.0
+R_0083,Barniz Marino,,,Paracas,Gl,,,0,5,0.0,0.0
+R_0085,Barniz Roble,,,Martell,Gl,,,0,5,0.0,0.0
+R_0086,Baygon espiral,mata mosquitos,,baygon, unidad ,,,0,5,0.0,0.7
+R_0087,Bencina solvente,galon 3.3L,,derquin,und,,,0,5,0.0,22.0
+R_0088,"Bisagra 1""",Bisagra remachada,,Halcon,caja(12par),,,0,5,12.0,0.0
+R_0089,Bisagra 2 1/2,2 1/2,,Sigma,caja(12par),,,0,5,12.0,0.0
+R_0090,Bisagra 4,P / escalera,, , par ,,,0,5,0.0,10.0
+R_0091,Bisagra 6,p/ Escalera,,, par ,,NEGOCIACIONES GENERALES CIA,0,5,0.0,10.0
+R_0092,Bisagra Ajustable de reten,INTERIOR,,Aster,unidad,,,0,5,29.0,0.0
+R_0093,Bisagra Capuch 3,caja 12 par,,Rino,caja(6par),,,0,5,6.0,24.0
+R_0094,Bisagra Capuch 3,par(2 unid),,Rino,Par,,,0,5,0.0,4.5
+R_0095,Bisagra Capuch 4,"4""",,,caja(6par),,,0,5,6.0,0.0
+R_0096,"Bisagra Capuch 4""",,,Indusmel,Par,,,0,5,7.4,9.0
+R_0097,"Bisagra Fija 1 1/2""","1 1/2""",,Halcon,caja(12par),,,0,5,12.0,0.0
+R_0100,Bisagra Fija 3 1/2,"3""",,Rino,caja(12par),,,0,5,12.0,21.0
+R_0103,"Bisagra Fija 4""","4""",,Indusmel,caja(6par),,,0,5,6.0,27.0
+R_0104,Bisagra Nylon,"3"" X 2 1/2""",,Fexaro,unidad,,,0,5,0.44,0.0
+R_0098,"Bisagra fija 2 ""","2""",,Indusmel,caja(12par),,,0,5,12.0,0.0
+R_0099,"Bisagra fija 2 1/2 """,,,,,,,0,5,0.65,0.0
+R_0101,Bisagra fija 3 1/2,3 1/2 alum,,, docena ,,,0,5,4.4,0.0
+R_0105,Broca 1/2,dorado,,hss, unidad ,,negociaciones generales,0,5,0.7,0.0
+R_0106,Broca 1/4,P/concreto 1/4,,EUROTOOLS, unidad ,,alfa,0,5,1.78,4.0
+R_0107,Broca 1/8,dorado,,hss, unidad ,,negociaciones generales,0,5,2.5,0.0
+R_0108,Broca 3/16,,,, unidad ,,,0,5,0.8,3.0
+R_0110,Broca 3/32,dorado,,hss, unidad ,,negociaciones generales,0,5,1.0,0.0
+R_0111,Broca 3/8,dorado,,, unidad ,,NEGOCIACIONES GENERALES CIA,0,5,1.25,0.0
+R_0112,Broca 5/16,P/Concreto 5/16,,EUROTOOLS, unidad ,,alfa,0,5,1.9,6.0
+R_0113,Broca 5/32,dorado,,hss, unidad ,,negociaciones generales,0,5,2.75,0.0
+R_0114,Broca 5/64,dorado,,hss, unidad ,,negociaciones generales,0,5,1.3,0.0
+R_0115,Broca 7/64,dorado,,hss, unidad ,,negociaciones generales,0,5,0.85,0.0
+R_0119,Broca Fierro dorado 5/16,dorado,,Eurotools, unidad ,,alfa,0,5,0.0,5.0
+R_0116,Broca concreto 1/4,,,eurotools, unidad ,,,0,5,0.0,4.0
+R_0117,Broca concreto 5/16,,,Eurotools, unidad ,,,0,5,0.0,5.0
+R_0118,Broca fierro 1/8,dorado,,Eurotools, unidad ,,alfa,0,5,0.8,2.0
+R_0126,"Brocha 1 1/2 """,Mango naranja,,Pionero,,,,0,5,3.74,2.0
+R_0127,"Brocha 1""",Mango naranja,,Pionero,,,,0,5,0.0,1.7
+R_0128,Brocha 1/2,M/Madera,,eco,,,,0,5,0.0,1.5
+R_0129,Brocha 1/2,Mango naranja,,Pionero,,,,0,5,2.5,1.0
+R_0130,"Brocha 2 1/2""",Mango naranja,,Pionero,,,,0,5,26.0,4.5
+R_0132,"Brocha 3""",Mango naranja,,Pionero,,,,0,5,35.0,6.0
+R_0133,"Brocha 3""",mangoNegro,,Tumi,,,,0,5,0.0,19.0
+R_0134,"Brocha 3""",mango azul,,C&A,,,,0,5,0.0,5.0
+R_0135,"Brocha 3/4""",Mango naranja,,Pionero,,,,0,5,43.0,1.5
+R_0136,"Brocha 4""",De Nylon M/Madera,,C & A, unidad ,,,0,5,0.0,7.5
+R_0137,"Brocha 4""",mango Negro,,Tumi,,,,0,5,0.0,26.0
+R_0138,"Brocha 5""",Mango naranja,,Pionero,,,,0,5,0.0,9.0
+R_0142,C Scolta 124,2 G cerradura blindada,,scolta,,,cerradiras nacionales travex,0,5,0.0,45.0
+R_0145,C Travex 333,3 G cerradura blindada,,travex,,,CERRADURAS NACIONALES TRAVEX,0,5,0.0,55.0
+R_0146,C Travex111,chapa 2 golpes,,cerradura,,,,0,5,0.0,0.0
+R_0144,C travex 130,Chapa 2 golpes,,cerradura,unidad,,,0,5,0.0,46.0
+R_0160,CAJA DE 2 POLOS ADOSABLE,,,, unidad ,,,0,5,0.0,6.0
+R_0166,CAJA PASE 4X4,100X100 PVC,,, unidad ,,ALFA,0,5,32.0,5.5
+R_0202,CERROJO SANSON,#03 FAMILIAR,,CABALLITO, DOCENA ,,,0,5,2.15,0.0
+R_0203,CERROJO SANSON,#02 Mediano,,, DOCENA ,,,0,5,0.8,0.0
+R_0204,CERROJO SANSON,#01 BB,,,DOCENA,,,0,5,2.2,0.0
+R_0217,CINTA DOBLE CONTACTO,19MMX2.5MM,,KNAUFF, unidad ,,,0,5,0.0,4.5
+R_0962,CINTA MALLA 90 M,,DRYWALL,,UNIDAD,,,15,5,10.0,15.0
+R_0221,"CINTA MASKING 1""","1""X30YDS",,PEGAFAN, unidad ,,,0,5,0.0,4.5
+R_0224,CINTA MASKING PRO 3/4,"3/4""X30YDS",,PEGAFAN, unidad ,,,0,5,0.0,3.5
+R_0262,"CLAVO DISPARO 1 1/2""",,Drywall,,,,,18,5,0.0,15.0
+R_0263,"CLAVO DISPARO 1""",,,, unidad ,,brandon,0,5,0.0,12.0
+R_0273,COCA COLA 1.5L  Ret,bebidas golosinas,Bebidas,,unidad,,,2,5,2.8,6.5
+R_0277,CODO 1/2,AGUA,,PAVCO, unidad ,,,0,5,0.0,2.5
+R_0279,"CODO 2""",,,, unidad ,,,0,5,5.7,4.0
+R_0280,COLA EXTRA,1 KG,,ORIENTAL, KG ,,,0,5,6.5,11.0
+R_0292,COLGADOR 1 1/2,,,EL PUMA, CIENTO ,,,0,5,0.0,1.0
+R_0293,COLGADOR 2,,,EL PUMA, CIENTO ,,,0,5,0.0,1.0
+R_0298,CUCHILLA ROUTER REBAJADOR,ROUTER REBAJADOR 1 1/4,,TRUPER, unidad ,,,0,5,5.3,25.0
+R_0300,CUTTER,,,EUROTOOLS, unidad ,,ALFA,0,5,2.25,1.2
+R_0150,Cable,THW90 450/750V 12AWG,,indeco negro,m,,,0,5,2.7,2.2
+R_0152,Cable,03/05kv2X16AWG gris,,Indeco,m,,,0,5,0.4,1.2
+R_0153,Cable,THW-90 450/750V 14AWG,,indeco rojo,m,,,0,5,0.0,1.2
+R_0156,Cable,NH-80 450/750V 4mm2,,indeco blanco,m,,,0,5,3.2,1.8
+R_0157,Cable,THW90 450/750V 12AWG,,Indeco blanco,m,,,0,5,48.0,1.4
+R_0161,Caja Modular P/instalacion,Caja p/ llave termica monof,,COASPA,unidad,,,0,5,0.0,5.0
+R_0167,Caja Rectangular,Luz,,, ciento ,,fabrode,0,5,12.0,80.0
+R_0165,Caja para Medidor PVC Nacional,,,, unidad ,,alfa,0,5,0.0,30.0
+R_0168,Cal nieve,Desinfectante Natural,,Derquin,kg,,,0,5,11.0,2.5
+R_0170,Calamina GALV,3.6X0.18,,,,,,0,5,5.07,25.0
+R_0171,Calamina GALV,3.6X0.20,,,,,,0,5,5.9,0.0
+R_0172,Calamina GALV,3.6X0.22,,,,,,0,5,4.75,30.0
+R_0173,Calamina GALV,3.6X0.25,,,,,,0,5,6.7,0.0
+R_0174,Calamina GALV,3.6X0.30,,,,,,0,5,6.7,49.0
+R_0169,Calamina GALV 0.14,3.6X0.14,techo,jr,UND,,,0,5,2.25,16.0
+R_0175,Calamina ROJO,3.6X0.22,,,unidad,,,0,5,9.8,30.0
+R_0179,Candado 30 MM,HB011-1,,EUROTOOLS, unidad ,,alfa,0,5,0.0,6.0
+R_0182,Candado 50 MM,HB011-3,,EUROTOOLS, unidad ,,alfa,0,5,0.0,9.0
+R_0183,Candado 60 MM,HB011-4,,EUROTOOLS, unidad ,,alfa,0,5,0.0,12.0
+R_0184,Candado anti cizalla 80 MM,,,INGCO, unidad ,,alfa,0,5,0.0,50.0
+R_0187,Capucha,rojo,,,ciento,,,0,5,0.0,6.0
+R_0188,Capucha,gris,,,ciento,,,0,5,34.5,6.0
+R_0189,Cautil 100 W,regulable,,INGCO, unidad ,,alfa,0,5,17.2,26.0
+R_0190,"Cepillo de copa de alambre 2"" WB30501","2""",,INGCO, unidad ,,alfa,0,5,14.0,4.5
+R_0191,"Cepillo de copa de alambre 3"" WB30751",3,,INGCO, unidad ,,,0,5,0.6,5.0
+R_0192,Cera al Agua,rojo,,Worsal,Gl,,,0,5,0.42,10.0
+R_0193,Cera al Agua,Blanco cono,,worsal,Gl,,,0,5,15.0,10.0
+R_0200,Cerradura Forte Bunker 240N,Chapa 3 gopes ,,Forte Bunker 240N,,,,0,5,0.0,75.0
+R_0197,Cerradura de Manija Cerrafor Peru,Caja amarilla ,,Cerrafor Peru ,unidad,,,0,5,3.7,14.0
+R_0201,Cerradura interior Forte,Forte BP-007,,Forte,unidad,,,0,5,0.0,35.0
+R_0210,Cinta Aislante ,820 tecnofan 3/4x20 yardas,,Pegafan, unidad ,,ardiles,0,5,164.0,5.0
+R_0208,Cinta aislante,810 tecnofan 3/4x5 Yardas,,Pegafan, unidad ,,ardiles,0,5,162.0,2.0
+R_0209,Cinta aislante,3/4 x 4.5 m,,3M, unidad ,,ardiles,0,5,0.0,3.0
+R_0211,Cinta aislante ,3/4 x 18 m,,3M, unidad ,,ardiles,0,5,0.0,5.5
+R_0216,Cinta aislante Negro pvc,10 yardas x 18 mm,,INGCO, unidad ,,alfa,0,5,0.0,1.5
+R_0212,Cinta aislante chico,,,Tecnofan,,,,0,5,0.0,2.5
+R_0213,Cinta aislante chico,,,3M,unidad,,,0,5,0.0,3.0
+R_0214,Cinta aislante grande,,,economico,,,,0,5,0.0,4.5
+R_0215,Cinta aislante grande,,,3M,unidad,,,0,5,0.0,6.0
+R_0220,Cinta embalaje 42 m,42x45mm,,, unidad ,,,0,5,0.0,4.0
+R_0222,Cinta masking 550,1/2 x 30,,Pegafan, unidad ,,camver,0,5,0.0,2.5
+R_0223,Cinta masking 550,1 x 30,,Pegafan, unidad ,,camver,0,5,0.0,5.0
+R_0226,Clavo 1 1/2 X 15 c/c,1 1/2 X 15 c/c,,,caja(30kg),,,0,5,30.0,182.0
+R_0227,Clavo 1 1/2 x 15 s/c,1 1/2 x 15 s/c,,,,,,0,5,0.0,7.5
+R_0228,Clavo 1 1/4 X 15 c/c,1 1/4 X 15 c/c,,,caja(30kg),,,0,5,30.0,8.0
+R_0230,Clavo 1 X 16 c/c,1 X 16 c/c,,,kg,,,0,5,7.5,10.0
+R_0231,"Clavo 1""  x 16s/c","1""  x 16s/c",,,kg,,,0,5,7.5,10.0
+R_0232,Clavo 2 1/2 X 10 c/c,21/2 X 10 c/c,,,kg,,,0,5,7.5,7.0
+R_0233,Clavo 2 1/2 X 12 c/c,21/2 X 12 c/c,,,kg,,,0,5,7.5,7.5
+R_0234,Clavo 2 1/2 X 13 C/c,21/2 X 13 C/c,,,kg,,,0,5,0.0,7.5
+R_0235,Clavo 2 1/2 X 13 s/c ,2 1/2 X 13 s/c ,,,kg,,,0,5,0.0,7.5
+R_0236,Clavo 2 X 12 c/c,2 X 12 c/c,,,kg,,,0,5,0.0,7.5
+R_0237,Clavo 2 X 13 c/c,2 X 13 c/c,,,kg,,,0,5,0.0,7.5
+R_0239,Clavo 3 X 12 S/c,3 X 12 S/c,,,kg,,,0,5,0.0,0.0
+R_0238,Clavo 3 X 12 c/c,3 X 12 c/c,,,kg,,,0,5,0.0,0.0
+R_0240,Clavo 3 X 9 c/c,3 X 9 c/c,,,kg,,,0,5,5.84,0.0
+R_0241,Clavo 3/4 X 17 c/c,3/4 X 17 c/c,,,kg,,,0,5,0.0,0.0
+R_0243,Clavo 4X7 c/c,4X7 c/c,,,kg,,,28,5,4.5,6.5
+R_0244,Clavo 5 X 6 c/c,5 X 6 c/c,,,kg,,,0,5,9.0,0.0
+R_0245,Clavo 5 X 6 c/c,5 X 6 c/c,,,kg,,,0,5,5.0,5.0
+R_0268,Clavo Vertical,2 1/2,,,,,,0,5,32.0,12.0
+R_0269,Clavo Vertical,3 1/2,,,,,,0,5,16.0,12.0
+R_0246,Clavo acero,3.5 X 65 mm,,barco,kg,,,0,5,7.5,0.0
+R_0247,Clavo acero,4.3 X 100mm ,,clavo vertical,caja(500gr),,,0,5,500.0,0.0
+R_0248,Clavo acero,4.3 X 75 mm,,Mejia,caja(500gr),,,0,5,500.0,0.0
+R_0249,Clavo acero,4 X 75 mm,,barco,caja(500gr),,,0,5,500.0,0.0
+R_0250,Clavo acero,4.3X5,,clavo vertical,caja(500gr),,,0,5,500.0,0.0
+R_0251,Clavo acero,3.5X50mm,,clavo vertical,caja(500gr),,,0,5,500.0,12.0
+R_0252,Clavo acero,2.0X25mm negro,,liso ,caja(500gr),,,0,5,500.0,10.5
+R_0253,Clavo acero,2.7 X 40 mm,,Mejia,caja(500gr),,,0,5,500.0,0.0
+R_0254,Clavo acero,2.7 X 30 mm,,Mejia,caja(500gr),,,0,5,500.0,0.0
+R_0256,Clavo calamina 2,"2"" calamina",,,kg,,,0,5,2.74,0.0
+R_0257,Clavo calamina 2 1/2,"2 1/2"" eternit",,,kg,,,0,5,1.2,0.0
+R_0258,"Clavo calamina 2""",con arandela neo,,eurotools, kg ,,ALFA,0,5,8.0,8.0
+R_0259,"Clavo de disparado 1 1/2""",,,,,,,0,5,0.0,0.0
+R_0260,"Clavo de disparado 1""",,,,,,,0,5,0.0,0.0
+R_0261,Clavo de disparado 3/4,,,,caja(100pzs),,,0,5,100.0,17.0
+R_0264,Clavo disparo 3/4,,,, ciento ,,,0,5,4.4,11.0
+R_0265,"Clavo liso negro 1 "" ",,,barco, caja ,,negociaciones generales cia,0,5,7.0,12.0
+R_0267,Clavo liso negro 2,,,, caja ,,,0,5,8.0,12.0
+R_0274,Coca cola 1L No ret,bebidas golosinas,,,,,,0,5,29.0,0.0
+R_0275,Coca cola 2L No Ret,bebidas golosinas,,,,,,0,5,0.0,0.0
+R_0276,Coca cola 3l No ret,bebidas golosinas,,,,,,0,5,19.25,0.0
+R_0278,Codo 1/2 bronce,bronce,,Eurotools, unidad ,,alfa,0,5,0.63,4.5
+R_0286,Cola Sint ec 1 kg,,,Pegsa,,,,0,5,0.0,7.0
+R_0287,Cola Sint ec extra 1Kg,,,pegsa,,,,0,5,0.0,9.0
+R_0288,Cola Sint eco 4Kg,,,Pegsa,,,,0,5,12.8,20.0
+R_0289,Cola Sint ultra 1 kg,,,Pegsa,,,,0,5,1.21,11.5
+R_0290,Cola Sint ultra 4 kg,,,Pegsa, unidad ,,ALFA,0,5,0.0,37.0
+R_0282,Cola s Clasica Tek1Kg,Cola sintetica,,Tekno,unidad,,,0,5,1.4,6.5
+R_0281,Cola s Clasica tek Gl,,,Tekno,Gl,,,0,5,1.4,21.0
+R_0283,Cola s Extra Tek 1Kg, ,,Tekno,unidad,,,0,5,1.35,9.2
+R_0284,Cola s Extra Tek Gl,,,Tekno,Gl,,,0,5,0.0,30.0
+R_0285,Cola s Ultra Tek Gl,,,Tekno,Gl,,,0,5,1.5,34.0
+R_0291,Cola sintetica,galon,,Derquin,Gl,,,0,5,3.04,19.0
+R_0294,Conector RG,Cable Tv,,, ciento ,,jupiter,0,5,0.86,100.0
+R_0295,Conector T coaxial,Cable Tv,,, unidad ,,jupiter,0,5,3.92,6.0
+R_0296,Conector utp ,,,eurolite, unidad ,,,0,5,3.2,0.29
+R_0297,Cordel plastico,soga plastico,,,,,,0,5,6.3,0.0
+R_0323,DISCO FLAP 4 1/2 N40,LIJA AZUL,,EUROTOOLS, unidad ,,ALFA,0,5,5.9,4.5
+R_0324,DISCO FLAP 4 1/2 N40,LIJA ROJA,,EUROTOOLS, unidad ,,ALFA,0,5,0.0,4.0
+R_0325,DISCO FLAP 4 1/2 N60,LIJA ROJA,,EUROTOOLS, unidad ,,ALFA,0,5,0.0,4.0
+R_0301,Desague A inox,,,ALFA, unidad ,,,0,5,1.8,9.0
+R_0302,Desarmador 6 en 1,,,Ingco, unidad ,,ALFA,0,5,1.8,8.5
+R_0303,"Desarmador pesado reversible 3""",,,EUROTOOLS, CAJA(24) ,,,0,5,24.0,72.0
+R_0304,"Desarmador rev 4""",alf-198 pesado,,EUROTOOLS, unidad ,,alfa,0,5,5.83,4.0
+R_0305,"Desarmador rev 4""",Pesado,,eurotools, docena ,,,0,5,13.1,3.5
+R_0306,Desarmador reversible ,6x90,,C&A, unidad ,,ardiles,0,5,0.8,3.5
+R_0321,Disco Diamante 4 1/2,4 1/2 X 7.5MM,,INGCO, unidad ,,ALFA,0,5,1.15,10.0
+R_0322,Disco Diamante 7 1/4,"concreto 7,5 mm",,INGCO, unidad ,,alfa,0,5,0.93,20.0
+R_0326,Disco Plato 4 1/2 5 lijas,p7amoladora,,Eurotools, unidad ,,,0,5,54.0,6.0
+R_0307,"Disco concreto diamond 4 1/2""x7/8""","concreto 4 1/2""x7/8""",,Almos,unidad,,,0,5,0.0,8.0
+R_0308,Disco corte 4 1/2,,,alfa, unidad ,,,0,5,0.0,3.0
+R_0316,"Disco corte Metal 7""x1/16""x7/8""","Metal 7""x1/16""x7/x8""",,Norton,unidad,,,0,5,0.0,8.0
+R_0310,"Disco corte maderA 7 1/4""x 24T","maderA 7 1/4""x24T",,UYUSTOOLS,,,,0,5,0.0,18.0
+R_0309,"Disco corte madera 4 1/2""x 24T","madera 4 1/2""x24T   ",,Hefesto,unidad,,,0,5,0.0,8.0
+R_0311,"Disco corte madera 7 1/4""x 40T","madera 7 1/4""x40T",,UYUSTOOLS,unidad,,,0,5,0.0,18.0
+R_0312,"Disco corte metal 4 1/2"" x 1.2mm",metal 4 1/2,,Pretul, unidad ,,,0,5,1.0,3.0
+R_0313,"Disco corte metal 4 1/2""x1/8""x7/8""","metal 4 1/2""x1/8""x7/x8""",,Norton,unidad,,,0,5,1.27,0.0
+R_0314,"Disco corte metal 4 1/2""x3/64""x7/8""","metal 4 1/2""x3/64""x7/x8""",,Norton,UNIDAD,,,0,5,1.79,5.0
+R_0315,"Disco corte metal 4 1/2""x3/64""x7/8""","4 1/2""x3/64""x7/8""",,tolsen,unidad,,,0,5,2.2,3.0
+R_0318,Disco de madera 4 1/2x40T,,,eurotools, unidad ,,alfa,0,5,0.0,8.0
+R_0319,Disco desbaste,4 1/2x1/4x7/8,,tolsen, UNIDAD ,,,0,5,0.0,5.0
+R_0320,Disco desbaste,4 1/2x1/4x7/8,,norton, UNIDAD ,,,0,5,2.8,8.5
+R_0327,Disco plato 7 1/4,c/5 lijas,,Eurotools, unidad ,,,0,5,1.89,10.0
+R_0328,EJE P/SIERRA COPA 1 1/4,mandril  para broca,,TRUPER, unidad ,,,0,5,4.0,17.0
+R_0335,ENCHUFE COLORES,15A PLANA,,EUROLITE, unidad ,,ALFA,0,5,6.35,2.0
+R_0349,ESCOBILLA COPA TRENZADA 4,,,EUROTOOLS, unidad ,,ALFA,0,5,13.5,9.0
+R_0354,ESMALTE GLOSS,ESMALTE BLANCO,,ISSA, unidad ,,issa,0,5,0.0,60.0
+R_0356,ESPATULA 3 ,INOXidable,,INGCO, unidad ,,ALFA,0,5,0.0,7.0
+R_0357,ESPATULA 8,INOXidable,,INGCO, unidad ,,ALFA,0,5,3.2,19.0
+R_0329,Encendedor,,,chino,unidad,,Jupiter,0,5,13.9,1.2
+R_0338,Enchufe Industrial,,,Volteck, unidad ,,ardiles,0,5,18.0,3.5
+R_0344,Envase 1/2GL,matizados,,, unidad ,,ALFA,0,5,9.0,1.5
+R_0345,Envase 1/4GL,matizados,,, unidad ,,ALFA,0,5,0.86,1.5
+R_0965,Escalera 6 pasos,,Madera,,,,,5,2,0.0,70.0
+R_0346,"Escobilla circular alambre 2"" WB40501",,,INGCO, unidad ,,,0,5,0.86,4.0
+R_0347,"Escobilla circular alambre 3"" WB40751",,,INGCO, unidad ,,,0,5,5.7,4.5
+R_0348,Escobilla circular alambre WB41001,,,INGCO, unidad ,,,0,5,2.7,5.0
+R_0350,"Escobilla de Copa Trenzada 3"" WB20751","3""",,INGCO, unidad ,,alfa,0,5,2.2,10.0
+R_0351,"Escobilla despeinada 1"" WB70241",,,INGCO, unidad ,,,0,5,0.0,4.0
+R_0352,"Escuadra 10""","scuadra10""",,,unidad,,,0,5,0.0,7.0
+R_0353,"Escuadra 8""","scuadra8""",,,unidad,,,0,5,3.8,5.5
+R_0355,"Espatula 2""",50mm,,prescot, unidad ,,,0,5,0.0,4.0
+R_0358,"Espatula mango madera 2 1/2""","madera 2 1/mango2""",,Almos,unidad,,,0,5,2.1,3.0
+R_0359,"Espatula mango madera 4""","mango4""",,Almos,unidad,,,0,5,9.2,4.5
+R_0360,"Espatula mango plastico 2 1/2""","plastico 2 1/mango2""",,,unidad,,,0,5,0.0,3.5
+R_0361,Espuma poliuretano,750 ml,,knauff, unidad ,,ALFA,0,5,8.34,22.0
+R_0362,Espuma poliuretano,500 ml,,knauff, unidad ,,ardiles,0,5,0.0,17.0
+R_0363,Espuma poliuretano,350 ml,,knauff, unidad ,,ardiles,0,5,22.0,12.0
+R_0364,Esquinero 3m,drywall,,construtek,unidad,,,0,5,11.5,6.5
+R_0365,Esquinero PVC,30 x 30 x 0.30 x 3,,, unidad ,,Jorge ramirez,0,5,6.5,10.0
+R_0366,Esta¤o para soldar,1mm x 80 gr,,eurotools, unidad ,,alfa,0,5,10.0,8.0
+R_0367,Extension 10m,c/foco neon 10m 16Awg,,Home Light, unidad ,,,0,5,0.0,20.0
+R_0368,Extension 15 m,cable vulc tomatriple,,Eurolite, unidad ,,alfa,0,5,0.0,25.0
+R_0369,Extension 15m,c/foco neon 15m 16Awg,,Home Light, unidad ,,,0,5,18.0,26.0
+R_0370,Extension 20m,c/foco neon 20m 16Awg,,Home Light, unidad ,,,0,5,15.0,32.0
+R_0371,Extension 20m,vulcanizado,,Eurotools, unidad ,,alfa,0,5,18.0,26.0
+R_0372,Extension 25 m,cable vulc tomatriple,,Eurolite, unidad ,,alfa,0,5,13.9,38.0
+R_0373,Extension 5m ,16 awg,,Home Light, unidad ,,ardiles,0,5,24.3,15.0
+R_0374,Extension 5m ,cable vulc tomatriple,,EUROLITE, unidad ,,alfa,0,5,5.9,28.0
+R_0375,Extension dado 1/4 ,,,Eurotools, unidad ,,,0,5,6.5,5.0
+R_0376,Extension dado 5/16,dado 5/16,,EUROTOOLS, unidad ,,alfa,0,5,0.0,5.0
+R_0383,FOCO 9W,9W,,CAMVER, unidad ,,,0,5,3.7,6.5
+R_0395,FOCO LED CIRCULAR 20W,LED 20W,,VOLE, unidad ,,,0,5,0.0,10.0
+R_0401,FULMINANTE MARRON,CAL 22,,, unidad ,,brandon,0,5,0.0,25.0
+R_0402,FULMINANTE MARRON,,,, unidad ,,Jorge ramirez,0,5,25.5,23.0
+R_0380,Felpa de colores,trapeador,,, unidad ,,jupiter,0,5,57.0,3.5
+R_0381,Foco 40 W,40W,,Wailec led serie,unidad,,,0,5,72.0,0.0
+R_0382,Foco 50W,amarillo,,Lamptan,unidad,,,0,5,5.0,2.5
+R_0388,Foco Balon 7W,,,Alfa, unidad ,,ALFA,0,5,6.7,5.0
+R_0392,Foco Led 50W,Led50W,,Konrad,,,,0,5,0.0,42.0
+R_0394,Foco Led Botella 50W,Policarbonato 7000K alf 1040,,Alfa, unidad ,,,0,5,0.0,16.0
+R_0384,Foco ahorrador 18,Foco18,,phelix,unidad,,,0,5,4.0,5.0
+R_0385,Foco ahorrador 36 ,Foco36,,Phelix,unidad,,,0,5,4.4,7.0
+R_0386,Foco ahorrador 85,Foco85,,phelix,unidad,,,0,5,0.0,14.0
+R_0387,Foco balon 15 W,Policarbonato alf 1050,,Alfa, unidad ,,alfa,0,5,11.76,5.5
+R_0389,Foco c/sensor,12 w,,Home Light, unidad ,,ardiles,0,5,0.0,14.0
+R_0390,Foco led 100W,led100W,,Konrad,,,,0,5,0.0,65.0
+R_0391,Foco led 50W,HIGH POWER L/DIA,,HOME LIGHT, unidad ,,,0,5,0.0,16.0
+R_0393,Foco led 65W,UFO led c/rosca 260mm,,Alfa, unidad ,,ALFA,0,5,0.0,30.0
+R_0396,"Formon 1""",,,INGCO, unidad ,,,0,5,0.0,14.0
+R_0397,"Formon goma 1""alf 542",,,, unidad ,,,0,5,0.0,13.0
+R_0398,Fulminante,Nivel 2 marron,,Powertek,caja,,,0,5,2.77,0.0
+R_0399,Fulminante,Nivel 3 verde,,Powertek,caja,,,0,5,3.0,0.0
+R_0403,Fulminante Verde,FulminanteVerde,,,caja(100pzs),,,0,5,100.0,30.0
+R_0400,Fulminante marron,Fulminantemarron,,,caja(100pzs),,,0,5,100.0,25.0
+R_0404,GABINETE 12 POLOS CAJA,EMPOTRABLE,,NACIONAL, unidad ,,ALFA,0,5,27.7,21.0
+R_0405,GABINETE 18 POLOS CAJA,EMPOTRABLE,,NACIONAL, unidad ,,ALFA,0,5,26.6,32.0
+R_0406,Gabinete 5 Polos,5 polos,,, unidad ,,Ferretools,0,5,9.0,11.0
+R_0407,Gabinete 8 Polos,Gabinete 8 Polos,,, unidad ,,Ferretools,0,5,0.0,12.0
+R_0954,Galleta soda,,Golosina,,,,,9,5,0.0,1.0
+R_0408,Gamezan (Polvo),piojos pulga hormiga,,El trome,,,,0,5,0.0,3.0
+R_0409,Gamezan en polvo,kg,,derquin,,,,0,5,0.0,8.0
+R_0413,Gancho Trupan 20,20 cm,,, ciento ,,,0,5,0.0,100.0
+R_0410,Gancho trupan 10,,,, ciento ,,negociaciones generales,0,5,0.0,0.0
+R_0411,Gancho trupan 12,,,, ciento ,,negociaciones generales,0,5,0.0,0.0
+R_0412,Gancho trupan 15,,,, ciento ,,negociaciones generales,0,5,0.0,0.0
+R_0414,Grapas clavos # 10,,,, ciento ,,Ferretools,0,5,0.0,9.5
+R_0415,Grapas clavos # 7,,,, ciento ,,Ferretools,0,5,0.0,8.0
+R_0416,Grapas clavos # 8,,,, ciento ,,Ferretools,0,5,0.0,8.5
+R_0417,Grapas clavos # 9,,,, ciento ,,Ferretools,0,5,0.0,9.0
+R_0420,Grapas para conductores electricos|,10,,Rimeplast,caja,,,0,5,0.0,12.0
+R_0421,Grifo Jardin Premium 3/4,,,alfa, unidad ,,alfa,0,5,0.0,16.8
+R_0422,Grifo Jardin Premium 3/4 salida 3/4 alf 2050,,,alfa, unidad ,,,0,5,0.0,15.5
+R_0423,Grifo Jardin Premium 3/4 salida 3/4 alf 2051,,,alfa, unidad ,,,0,5,0.0,16.0
+R_0426,Guante Blanco,GuanteBlanco,,,par,,,0,5,0.0,3.0
+R_0434,Guante Industrial,Negro,,,unidad,,,0,5,0.0,5.0
+R_0437,Guante Negro,talla S,,Segpro, unidad ,,IMPEXP SH,0,5,2.9,4.5
+R_0424,Guante anticorte negro ,Tama¤o 9,,Alfa, Par ,,alfa,0,5,0.0,3.5
+R_0427,Guante de latex,delatex,,DKASA,unidad,,,0,5,0.0,7.5
+R_0428,Guante de seguridad,Tela gris goma azul,,Power Flex,par,,,0,5,4.25,6.0
+R_0429,Guante de seguridad,tela roja,,Ecco tools,par,,,0,5,0.0,5.0
+R_0430,Guante de seguridad,tela roja,,Eccoperu,par,,,0,5,3.25,5.0
+R_0431,Guante de seguridad,Cuero amarillo gris,,,par,,,0,5,2.8,5.0
+R_0432,Guante de seguridad,Cuero amarillo,,,par,,,0,5,1.2,7.0
+R_0433,Guante de seguridad,tela roja,,Clute,par,,,0,5,0.0,7.0
+R_0966,Guante de seguridad SEGPRO,, Seguridad,,,,,20,5,3.2,5.0
+R_0435,Guante limpieza,Conveniente limpieza,,c & a, unidad ,,,0,5,0.0,4.5
+R_0436,Guante multiflex,rojo amarillo L M,,Segpro, unidad ,,IMPEXP SH,0,5,0.0,5.0
+R_0438,Guarana Lata,bebidas golosinas,,,,,,0,5,4.2,2.0
+R_0440,Gyplac RH (1/2),drywall,,gyplac,unidad,,,0,5,7.94,40.5
+R_0439,Gyplac ciel 7mm,drywall,,,unidad,,,0,5,48.8,27.5
+R_0441,Gyplac12.7mm1/2),drywall,,gyplac,unidad,,,0,5,3.91,29.2
+R_0442,Gyplac9.5mm3/8),drywall,,gyplac,unidad,,,0,5,11.49,28.5
+R_0443,Hidroxido de potasio,limpia tuberias,,derquin ,,,,0,5,5.24,12.0
+R_0444,Hoja de sierra,"12"" x 18T",,INGCO, unidad ,,alfa,0,5,1.91,3.5
+R_0445,Hormiguicida,elimina Hormiga ara¤a inse,,El trome,,,,0,5,3.84,0.0
+R_0448,Humo mosquito,insecticida mosquitos,,Cock Brand,caja,,,0,5,0.0,4.0
+R_0452,INCA COLA 1.5L No Ret,bebidas golosinas,,,,,,0,5,0.0,6.5
+R_0466,INTERRUPTOR DOBLE ,BLANCO,,CUBULL, unidad ,,,0,5,1.1,9.0
+R_0469,INTERRUPTOR SIMPLE,SIMPLE BLANCO,,CUBULL, unidad ,,,0,5,0.0,8.0
+R_0471,INTERRUPTOR VISIBLE,,,NEWSPARK, unidad ,,,0,5,0.0,3.0
+R_0451,Inca cola ,bebidas golosinas,,,,,,0,5,17.6,0.0
+R_0453,Inca cola 1L No ret,bebidas golosinas,,,,,,0,5,0.0,0.0
+R_0454,Inca cola 2L No Ret,bebidas golosinas,,,,,,0,5,0.0,0.0
+R_0455,Inca cola 3l No ret,bebidas golosinas,,,,,,0,5,1.7,0.0
+R_0459,Insecticida Baygon,Contra cucarachas,,Johnson,,,,0,5,0.0,15.0
+R_0460,Insectisida spray,"spray, mosca cucaracha",,Bin Laden Mata todo,,,,0,5,2.17,0.0
+R_0461,Interruptor 1,nterruptor1,,,unidad,,,0,5,2.7,0.0
+R_0463,Interruptor 1 ,nterruptor1,,BTicino,unidad,,,0,5,0.99,0.0
+R_0465,Interruptor Doble,Para pared,,Ferre Light,unidad,,,0,5,0.0,0.0
+R_0467,Interruptor Doble Empotrable,,,Eurolite, unidad ,,alfa,0,5,0.0,7.0
+R_0464,Interruptor aereo,Interruptoraereo,,Spark,unidad,,,0,5,0.0,2.0
+R_0468,Interruptor monofacico,5,,Bticino,,,,0,5,0.0,0.0
+R_0470,Interruptor simple,empotrable,,delux, unidad ,,,0,5,0.0,6.0
+R_0475,Interuptor termico Trifasico,C  32a,,Enervolt age,unidad,,,0,5,0.0,25.0
+R_0472,Interuptor termico monofasico,C   30A,,CBB,unidad,,,0,5,0.0,0.0
+R_0473,Interuptor termico monofasico,C   25A,,CBB,unidad,,,0,5,1.32,0.0
+R_0474,Interuptor termico monofasico,C  20A,,CBB,,,,0,5,0.0,0.0
+COM-01,Item Comision,,,,,,,0,5,0.0,100.0
+R_0476,Jalador oval grande,Jalador oval grande,,, unidad ,,,0,5,0.0,6.0
+R_0478,Juego de brocas enrutador,enrutador 12 piezas,,INGCO, unidad ,,alfa,0,5,0.0,60.0
+R_0479,Juego tijera,,,wings, unidad ,,camver,0,5,1.54,7.0
+R_0480,KM117 JUG HERRAM P/INSTALAR CHAPASX3PCS,,,KAMASA,,,,0,5,1.9,12.0
+R_0481,KM1184 DISCO DE LIJAS P40 115MM,,,KAMASA,,,,0,5,1.7,5.0
+R_0482,KM120 JGO SIERRA COPA P/MADERA 7PCS,,,KAMASA,,,,0,5,1.7,17.0
+R_0483,KM1402 JUG ACCESORIO P/PULIRX 6PCS 115MM,,,KAMASA,,,,0,5,1.7,8.5
+R_0484,KM636 DESTORNILLADOR 2 PUNTAS 6*75MM,,,KAMASA,,,,0,5,0.0,3.5
+R_0485,KM692 DESARMADOR 2PUNTOS 6*100MM,,,KAMASA,,,,0,5,3.4,5.5
+R_0487,LANA FIBRA,1.2 X 2 X 12 M   ,,, unidad ,,Jorge ramirez,0,5,0.0,68.0
+R_0505,LIJA AL AGUA 120,,,, UNIDAD ,,,0,5,14.0,1.8
+R_0550,LLAVE TERMICA,2X32,,NUEVA ERA, UNIDAD ,,,0,5,6.0,20.0
+R_0486,Laca Selladora,LacaSelladora,,,Gln,,,0,5,3.0,38.0
+R_0488,Lana fibra de vidrio Steel,drywall,,,unidad,,,0,5,0.0,88.0
+R_0489,Lapicero azul,lux 034,,Faber Castell,unidad,,,0,5,0.0,0.8
+R_0490,Lapicero azul,Trilix 031,,Faber Castell,unidad,,,0,5,0.0,0.7
+R_0491,Lapiz Carpintero,LapizCarpintero,,Besttools,,,,0,5,5.8,1.5
+R_0492,Led c/rosca 65 W,,,, unidad ,,alfa,0,5,8.05,26.0
+R_0493,Lejia 1 Gl,,,,unidad,,DERQUIN,4,5,6.5,9.0
+R_0494,Lejia 1 L,ejiaLejia,,Derquin,Gl,,,0,5,5.8,0.0
+R_0495,Lejia 500ml,500 ml,,Derquin,unidad,,,0,5,1.6,0.0
+R_0497,Lente de Seguridad,sp100,,Segpro, unidad ,,IMPEXP SH,0,5,2.1,5.0
+R_0501,Lente de Seguridad,Pesado transparente anti-Impacto,,Eurotools, unidad ,,ALFA,0,5,1.13,5.0
+R_0502,Lente de Seguridad,Pesado transparente anti-Impacto,,EUROTOOLS, unidad ,,alfa,0,5,0.0,4.5
+R_0496,Lente de seguridad,,,eco, unidad ,,,0,5,2.15,3.5
+R_0498,Lente de seguridad,blanco,,Clute,unidad,,,0,5,2.62,5.0
+R_0499,Lente de seguridad,Negro,,Clute,unidad,,,0,5,6.6,3.0
+R_0500,Lente de seguridad,deseguridad,,Hefesto,unidad,,,0,5,1.13,5.0
+R_0513,Lija Fierro 100,esmeril,,Asa,,,,0,5,24.25,2.8
+R_0514,Lija Fierro 120,esmeril,,Asa,,,,0,5,0.0,2.8
+R_0515,Lija Fierro 150,esmeril,,Asa,,,,0,5,0.0,2.8
+R_0516,Lija Fierro 180,,,Fandeli, unidad ,,IMPEXP SH,0,5,0.0,2.3
+R_0517,Lija Fierro 180,esmeril,,Asa,,,,0,5,0.0,2.8
+R_0518,Lija Fierro 220,esmeril,,Asa,,,,0,5,31.0,2.8
+R_0519,Lija Fierro 40,esmeril,,,unidad,,,48,5,2.0,2.5
+R_0520,Lija Fierro 50,esmeril,,Asa,,,,0,5,63.9,3.0
+R_0521,Lija Fierro 60,esmeril,,Asa,,,,0,5,4.5,3.0
+R_0523,Lija Fierro 80,esmeril,,Asa,,,,0,5,0.0,3.0
+R_0504,Lija al agua 1000,,,Asalite,,,,0,5,21.35,0.0
+R_0506,Lija al agua 120,al120,,Asalite,,,,0,5,0.7,1.7
+R_0507,Lija al agua 150,al150,,Asalite,,,,0,5,0.7,1.7
+R_0508,Lija al agua 180,al180,,Asalite,,,,0,5,0.64,1.8
+R_0509,Lija al agua 180,,,Abralit, unidad ,,camver,0,5,0.0,1.5
+R_0510,Lija al agua 220,al220,,Abralit,,,,0,5,0.48,1.7
+R_0511,Lija al agua 320,,,Asalite,,,,0,5,0.0,2.0
+R_0512,Lija al agua 600,al600,,Asalite,,,,0,5,27.0,1.7
+R_0527,Llave 11,,,KAMASA,,,,0,5,32.5,4.5
+R_0528,Llave 17 mm,mixta chrome van,,EUROTOOLS, unidad ,,alfa,0,5,63.9,7.0
+R_0533,"Llave Francesa 10""","Llave10""",,Profield,unidad,,,0,5,2.0,15.0
+R_0534,"Llave Francesa 12""",Pesada,,Kamasa,unidad,,,0,5,43.0,18.0
+R_0535,"Llave Francesa 6""","Llave6""",,Almos,unidad,,,0,5,32.0,8.0
+R_0549,Llave Temomagnetica trifasica,3x40,,Stronger New Era, unidad ,,ALFA,0,5,6.0,35.0
+R_0529,Llave alen,,,eco,,,,0,5,1.0,5.0
+R_0530,Llave de dados,Combination soquet wrench set 1/4 3/8,,AIWA,Juego,,,0,5,1.5,0.0
+R_0531,"Llave estilson 12""",,,INGCO,,,,0,5,0.0,20.0
+R_0532,"Llave estilson 18""",,,INGCO,,,,0,5,2.21,32.0
+R_0536,"Llave francesa 6"" 150mm",,,INGCO, unidad ,,alfa,0,5,0.0,9.0
+R_0537,"Llave francesa 8"" 200mm",,,INGCO, unidad ,,alfa,0,5,0.0,13.0
+R_0544,Llave mixta c/ratchet,11mm,,C&A, unidad ,,ardiles,0,5,12.0,12.0
+R_0547,"Llave stilson 10""","Llave10""",,c&a  tools,unidad,,,0,5,10.0,20.0
+R_0548,"Llave stilson 8""","Llave8""",,,unidad,,,0,5,6.0,0.0
+R_0551,Llave termomagnetica,trifasica 3 x 40,,New era stronger, unidad ,,,0,5,6.0,35.0
+R_0552,Luna soldar 10,ALF 053,,EUROTOOLS, unidad ,,alfa,0,5,7.8,1.5
+R_0554,M FLEX CORRUGADA 3/4,3/4 PVC GRIS,,manguera, metro ,,ALFA,0,5,0.0,1.2
+R_0557,MARTILLO,MARTMARTILLO,,KAMASA,,,,0,5,0.0,14.0
+R_0566,MASILLA 20 KG,,,VOLCAN, UNIDAD ,,,0,5,9.5,35.0
+R_0963,MASILLA 20 KG GYPAL,,DRYWALL,,UNIDAD,,,6,5,33.0,36.0
+R_0567,MASILLA 5 KG,,,VOLCAN, UNIDAD ,,,0,5,0.0,14.0
+R_0569,MASILLA CALAMINA,1 KG,,ORIENTAL, KG ,,,0,5,4.6,7.0
+R_0584,MULTIPLACA 4MM,,,ETERNIT, UNIDAD ,,,0,5,17.0,34.0
+R_mad01,Madera,madera caobilla,Madera,,UND,,,99,100,0.0,4.5
+R_0555,Manguera,3-Ago,,Termo Plastico,m,,,0,5,0.0,10.0
+R_0556,Manguera Corrugada 1/2,PVXC gris 100 m,,, unidad ,,,0,5,0.0,0.9
+R_0559,Martillo 16 OZ HCH8168,,,INGCO, unidad ,,,0,5,10.0,15.0
+R_0558,Martillo 16 oz,u¤a curva M tubular c/neopreno,,Truper, unidad ,,,0,5,0.0,32.0
+R_0560,Martillo Mango erconomico,560G 355 MM,,INGCO, unidad ,,g,0,5,13.2,30.0
+R_0561,Martillo u¤a 16oz,Mango Fibra de vidrio 16 oz,,Truper, unidad ,,,0,5,20.3,30.0
+R_0562,Mascarilla ,ascarillaMascarilla,,Surgical,unidad,,,0,5,10.2,1.0
+R_0563,Mascarilla antipolvo,Mascarillaantipolvo,,Wings,unidad,,,0,5,1.43,5.0
+R_0564,Mascarilla respirador,Mascarillarespirador,,Bellsafe,unidad,,,0,5,7.0,5.5
+R_0565,Masilla ,,,,,,,0,5,8.0,0.0
+R_0960,Masilla 5 Kg Derquin,,Drywall,,UNIDAD,,DERQUIN,4,4,10.0,12.0
+R_0574,Masilla Drywall,Romeral 25 kg,,gyplac,,,,0,5,0.0,0.0
+R_0575,Masilla Gyplac,caja 20 kg,,gyplac,unidad,,,0,5,0.0,36.0
+R_0576,Masilla Gyplac,Balde(27kg),,gyplac,unidad,,,0,5,0.0,70.0
+R_0568,Masilla balde 27 kg,balde 27kg,,gyplac, unidad ,,,0,5,13.0,70.0
+R_0570,Masilla drywal,Bolsa 5kg,,Gyplac,,,,0,5,5.8,0.0
+R_0571,Masilla drywal,caja 20 kg,,Construtek,,,,0,5,0.0,0.0
+R_0572,Masilla drywal,Bolsa 5Kg,,Construtek,,,,0,5,0.53,0.0
+R_0573,Masilla drywal,Bolsa 1Kg,,economico,,,,0,5,0.0,0.0
+R_0577,Masilla madera,rojo,,Derquin,kg,,,0,5,9.4,1.5
+R_0578,Masilla madera,Blanco,,worsal,kg,,,0,5,11.0,2.0
+R_0579,Mata ratas,mata ratas ratones,,Killer Campeon ,unidad,,,0,5,12.9,2.5
+R_0580,Mecha Plana 1 1/4,,,EUROTOOLS, unidad ,,alfa,0,5,17.2,37.9
+,Mecha plana 3/4,,,EUROTOOLS, unidad ,,,0,5,0.0,4.0
+R_0581,Mecha plana 3/4,,,EUROTOOLS, unidad ,,,0,5,20.8,4.0
+R_0582,Mecha plana 7/8,alf-176,,EUROTOOLS, unidad ,,alfa,0,5,23.0,5.0
+R_0583,Medidor Monofasico 10(40) AMP SGM73L,Digital,,Stronger, unidad ,,alfa,0,5,8.1,62.0
+R_0587,NIVEL 60CM,ALUMINIO AMARILLO,,INGCO, unidad ,,ALFA,0,5,39.0,25.0
+R_0588,NIVEL 80CM,ALUMINIO AMARILLO,,INGCO, unidad ,,ALFA,0,5,13.2,28.0
+R_0594,NORDEX,HDF MOTECK,,1.52X2.44, unidad ,,ALFA,0,5,0.0,30.0
+R_0585,Nivel 14 plg,amar plastico,,Kamasa,,,,0,5,17.0,10.0
+R_0586,Nivel 18 plg,Amarillo plastoco,,Kamasa,,,,0,5,27.2,12.0
+R_0589,Nivel Al 30cm,,,EUROTOOLS, unidad ,,alfa,0,5,0.0,10.0
+R_0590,Nivel Al 40cm,,,EUROTOOLS, unidad ,,alfa,0,5,0.0,11.5
+R_0591,Nivel aluminio 40 cm HSL58040,,,INGCO,,,,0,5,0.33,11.0
+R_0592,Nivel aluminio 60 cm HSL58060,,,INGCO,,,,0,5,44.0,14.0
+R_0593,Nogalina,ogalinaNogalina,,,kg,,,0,5,0.0,27.0
+R_0595,Nylon(pescar) 100,100,,araty, unidad ,,jupiter,0,5,52.4,14.0
+R_0596,Nylon(pescar) 40,40,,araty, unidad ,,jupiter,0,5,3.91,8.0
+R_0597,Nylon(pescar) 70,70,,araty, unidad ,,jupiter,0,5,5.2,12.0
+R_0598,Nylon(pescar) 80,80,,araty, unidad ,,jupiter,0,5,8.16,12.0
+R_0604,OSB 18mm,1.22mX2.44m,,brasile¤o,,,,0,5,33.1,75.0
+R_0606,OSB 8mm,1.22mX2.44m,,TAYLANDES,,,,0,5,11.5,36.0
+R_0605,OSB Brasilero 8 mm,1.22 m X 2.44 m,paneles,,unidad,,G & V ,114,5,33.0,38.0
+R_0599,Ocre,rojo,,Bayer 130,kg,,,0,5,7.08,10.0
+R_0600,Ocre,amarillo920,,Bayer 130,kg,,,0,5,0.0,10.0
+R_0601,Ocre,Negro,,Bayer 130,kg,,,0,5,0.0,10.0
+R_0602,Ocre,Verde,,Bayer 130,kg,,,0,5,32.0,10.0
+R_0603,Omega 3m,drywall,,,unidad,,,0,5,7.6,10.0
+R_0610,PANEL LED 2X18W,600X75X25MM,,ALFA, unidad ,,ALFA,0,5,19.6,15.0
+R_0611,PANEL LED 3X18W,1200X75X25MM,,ALFA, unidad ,,ALFA,0,5,0.0,19.0
+R_0613,PANEL LED REDONDO,18W SOBREPONER,,ALFA, unidad ,,ALFA,0,5,18.0,15.0
+R_0620,PEGAMENTO AFRICANO 1/32,TEROCAL,,IMPORTADO,unidad,,,0,5,11.74,6.0
+R_0623,PERCHERO,PARED,,, par ,,ALFA,0,5,0.0,1.5
+R_0644,PINTURA TRAFICO,AMARILLO TRAFICO,,ISSA, unidad ,,issa,0,5,0.0,50.0
+R_0660,"PRENSA TIPO ""C"" 4""",,,C&A, unidad ,,,0,5,0.0,13.0
+R_0661,"PRENSA TIPO ""C"" 4""","""4""",,eurotools, unidad ,,ALFA,0,5,0.0,15.0
+R_0662,"PRENSA TIPO ""C"" 4""",4 X 100MM,,INGCO, unidad ,,ALFA,0,5,0.0,18.0
+R_0663,"PRENSA TIPO ""C"" 6""",6 X 150MM,,INGCO, unidad ,,ALFA,0,5,0.0,25.0
+R_0607,Pabilo,Pabilo,,el alguila,kg,,,0,5,7.95,0.0
+R_0608,Pabilo,Blanco cono,,,unidad,,,0,5,9.7,1.0
+R_0609,Pabilo,madeja,,Pegaso,unidad,,,0,5,12.9,0.6
+R_0612,Panel led 40W,60cm / 40W,,, unidad ,,Ferretools,0,5,0.0,28.0
+R_0615,Parante 38,38x45x3,,,UNIDAD,,brandon,0,5,0.0,8.5
+R_0616,Parante 64,64x45x3,DRYWALL,,UNIDAD,,INCA,100,5,6.2,8.5
+R_0617,Parante 89,89x45x3,,,UNIDAD,,brandon,0,5,0.0,12.0
+R_0614,Pa¤o amarillo,,,, unidad ,,jupiter,0,5,0.0,2.0
+R_0619,Pegachap 0.946 L,terocal pegamento,,Pegsa,,,Pegsa,0,5,0.0,18.0
+R_0621,Pegamento azul,p tubo,,Oatey, unidad ,,jupiter,0,5,24.7,8.0
+R_0622,"Pelacable 6""","Pelacable6""",,Kamasa,unidad,,,0,5,30.0,10.0
+R_0624,Perfumador Amb,Talco Bebe,,Derquin,,,,0,5,0.0,0.0
+R_0625,Perfumador Desinfectante,"Green Apple. Desinfecta limpia, perfuma ",,Martell,Gl,,,0,5,0.0,11.0
+R_0626,Perfumador Desinfectante,Bouquet Garden,,Martell,Gl,,,0,5,5.5,11.0
+R_0627,Perfumador Desinfectante,Lavanda Polar,,Martell,Gl,,,0,5,6.5,11.0
+R_0629,Perno 1/4 x 1 1/2,zincado,,Hexagonal, ciento ,,NEGOCIACIONES GENERALES CIA,0,5,0.0,22.0
+R_0630,Perno 1/4 x 2,zincado,,Hexagonal, ciento ,,NEGOCIACIONES GENERALES CIA,0,5,0.0,24.0
+R_0631,Perno 1/4 x 2 1/2,Hexagonal,,, ciento ,,CIA,0,5,2.25,25.0
+R_0632,Perno 1/4 x 3,Hexagonal,,, ciento ,,CIA,0,5,0.0,28.0
+R_0634,Perno 1/4 x 3/4,hexagonal,,, ciento ,,,0,5,0.0,0.0
+R_0637,Perno 1/4 x 5,coche ,,, ciento ,,,0,5,0.0,0.0
+R_0640,Pin clavo,"1""  25mm",,Powertek,caja,,,0,5,10.3,0.0
+R_0641,Pin clavo,Pinclavo,,Power Fastemer,caja,,,0,5,15.1,0.0
+R_0642,Pincel #6,cerda t/plano #6,,C & A, unidad ,,,0,5,44.0,1.0
+R_0646,Placa de cemento 4 mm,1.22mX2.44m,,Multiplaca 4 mm,unidad,,,0,5,0.0,24.0
+R_0648,"Plancha Batir 7""","m/madera 7""",,c & a, unidad ,,,0,5,0.0,8.0
+R_0649,"Plancha Batir 7""",M/Goma,,C&A, unidad ,,ardiles,0,5,5.61,9.0
+R_0650,Plancha de Empastar,280x130mm,,prescot, unidad ,,,0,5,27.0,12.0
+R_0651,Plancha empastar lisa,m/madera 11x5,,c &a, unidad ,,,0,5,13.5,12.5
+R_0652,"Platina 1 1/2"" x 1 1/4""","1/2"" x 1 1/ x4""",,,unidad,,,0,5,11.4,0.9
+R_0653,Platina 120 mm ,platina zinc 120 mm,,el puma, unidad ,,negociaciones generales cia,0,5,5.5,1.8
+R_0654,"Platina 3"" x 1"""," x1""",,,unidad,,,0,5,6.1,1.4
+R_0655,Plywood Okoume,1.22x2.44x4mm,,okoume, unidad ,,,0,5,11.31,38.0
+R_0656,"Prensa 3""",Tipo C,,C&A, unidad ,,ardiles,0,5,6.5,11.0
+R_0657,Prensa Rapida Tipo C,"600mm 24"" 135 Kg",,Ingco, unidad ,,ALFA,0,5,2.1,40.0
+R_0658,Prensa Rapida tipoc,"150 mm 6""",,ingco, unidad ,,alfa,0,5,1.8,14.0
+R_0659,Prensa Rapida tipoc,"300 mm 12""",,ingco, unidad ,,alfa,0,5,0.0,16.0
+R_0664,Preservante,reservantePreservante,,Dhermarsac,Gl,,,0,5,6.88,16.0
+R_0665,Preservante,reservantePreservante,,Martell,Gl,,,0,5,1.9,0.0
+R_0666,Preservante,reservantePreservante,,Derquin,Gl,,,0,5,2.1,22.0
+R_0667,Preservante,reservantePreservante,,worsal,Gl,,,0,5,0.0,0.0
+R_0668,Preservante 1L,Preservante1L,,worsal,L,,,0,5,0.0,6.0
+PROD-STOCK,Producto Con Stock,,,,,,,0,5,0.0,10.0
+TEST01,Producto Test,,TEST,,Und,,,49,5,60.0,100.0
+R_0669,Pulguicida,EliminaPulgas garrapatas,,Chica Verano,,,,0,5,0.0,3.0
+R_0670,Quitasarro 1 L,,,,,,,0,5,0.0,5.0
+R_0674,REFLECTOR C/SENSOR,sensor 50W,,PORTIZA, UNIDAD ,,,0,5,0.0,30.0
+R_0675,REGLA DE 3 1/4X 1 1/2X 3M,ECONOMICA ALUMINIO,,, unidad ,,,0,5,0.0,45.0
+R_0671,Rafia,madeja,,,unidad,,,0,5,0.0,1.0
+R_0672,Raticida,mata pericote rata,,El Zorro,,,,0,5,0.0,2.5
+R_0673,Rayd pastillas,zancudo repuesto 24 unid,,Rayd, unidad ,,,0,5,0.0,0.8
+R_0676,Repelente,pastilla,,Cock Brand,,,,0,5,0.0,10.0
+R_0677,Repelente,maq c/3 pastilla repelente,,Cock Brand,,,,0,5,0.0,0.0
+R_0678,Respirador N95,N95,,3M,unidad,,,0,5,1.5,0.0
+R_0679,Riel 39,39x0.45x3,,,,,,0,5,2.8,8.5
+R_0680,Riel 65,65 x 0.45 X 3,DRYWALL,,unidad,,,80,5,6.0,7.5
+R_0681,Riel 90,90x0.45x3,,,,,,0,5,3.6,10.0
+R_0682,"Rodillo 12""",blanco,,,,,,0,5,3.8,15.0
+R_0683,"Rodillo 12""",melon,,Toro,unidad,,,0,5,3.8,22.0
+R_0684,"Rodillo 3""",p/pintar,,C & A, unidad ,,,0,5,4.2,6.0
+R_0685,"Rodillo 3""",melon,,Toro,,,,0,5,3.8,11.5
+R_0686,"Rodillo 9""",Melon,,Toro,UNIDAD,,,0,5,3.8,19.0
+R_0687,"Rodillo 9""",Blanco,,,,,,0,5,3.8,0.0
+R_0688,"Rodillo 9""",pintar,,C&A, unidad ,,ardiles,0,5,6.8,8.0
+R_0689,Rollo lija 80,Rollo tela 12x45.72m,,Fandeli, unidad ,,IMPEXP SH,0,5,3.52,16.0
+R_0704,SIERRA COPA,JUEGO DE 5 PZS,,PRETUL, UNIDAD ,,,0,5,0.0,18.5
+R_0705,SIERRA COPA,3PZS,,PRETUL, UNIDAD ,,,0,5,52.5,16.5
+R_0708,SIERRA COPA 1 1/4,,,TRUPER, unidad ,,,0,5,23.0,15.0
+R_0709,SIERRA COPA 6 PZAS,,,, UNIDAD ,,,0,5,34.0,10.0
+R_0710,SOCKET,BLANCO OVAL,,EUROLITE, unidad ,,ALFA,0,5,52.9,4.5
+R_0711,SOCKET,MARFIL OVAL,,EUROLITE, unidad ,,ALFA,0,5,45.0,4.0
+R_0717,SOLDIMIX EXTRAFUERTE,35GT,,SOLDIMIX, UNIDAD ,,,0,5,36.0,10.0
+R_0718,SOQUET,,,EPEM, unidad ,,,0,5,95.0,4.0
+R_0719,SOQUET BLANCO OVAL,,,EUROLITE, unidad ,,ALFA,0,5,6.5,5.0
+R_0731,SOQUET PLANO PLATO,,,EUROLITE, unidad ,,ALFA,0,5,40.63,4.0
+R_0759,SUPERBOARD 6MM,,,, UNIDAD ,,,0,5,13.4,56.0
+R_0690,Sellador Pva,Fijador Nivelador,,Majestad,Gl,,,0,5,3.52,12.0
+R_0692,Sensor de movimiento,360G/6M,,Home Light, unidad ,,,0,5,5.0,17.0
+R_0693,Serrucho 450 mm,,,INGCO, unidad ,,,0,5,6.5,15.0
+R_0694,Set Brochas 9 Pcs,,,INGCO, juego ,,alfa,0,5,50.0,22.0
+R_0695,Set llave Mixta chrome vanadium 14 Pcs,"7,8,10,11,12,13,14,15,16,17,18,19,22,24 mm",,Eurotools, set ,,alfa,0,5,6.5,63.0
+R_0697,Shampoo,hampooShampoo,,Head&Shoulders,,,,0,5,10.0,1.2
+R_0698,Shampoo,Permetrina 1%,,Nopucid 10 2 en 1,,,,0,5,16.25,2.0
+R_0699,Shampoo,mata pulga garrapata acaro,,Amigo,,,,0,5,5.7,1.0
+R_0700,Shampoo medicado,Todo tipo de pelaje(pulgas),,Linda Can,,,,0,5,3.2,0.0
+R_0701,Sicka,Impermeabilizante,,worsal,kg,,,0,5,8.9,6.0
+R_0702,Sierra caladora,set de 5,,INGCO, unidad ,,alfa,0,5,0.0,10.0
+R_0703,Sierra circular p/madera,"7 1/4, 40 dientes 5/8 ",,truper, unidad ,,,0,5,0.0,32.0
+R_0706,Sierra copa,3pcs,,EUROTOOLS, juego ,,,0,5,13.3,9.0
+R_0707,Sierra copa,6 pcs,,EUROTOOLS, juego ,,,0,5,70.0,11.0
+R_0713,Soga,1-Abr,,,m,,,0,5,35.0,1.5
+R_0714,Soga,Yute,,,kg,,,0,5,34.0,0.0
+R_0715,Soga,3-Ago,,,m,,,0,5,16.0,1.2
+R_0712,Soga 1/2,1-Feb,,,m,,,10,5,1.4,1.8
+R_0716,Soldimix 10min,,,,,,,0,5,20.5,9.0
+R_0720,Soquet colgante,Soquetcolgante,,,unidad,,,0,5,6.5,1.8
+R_0721,Soquet colgante,Soquetcolgante,,Epem,unidad,,,0,5,342.0,1.2
+R_0722,Soquet colgante ceramico,colganteceramico,,,unidad,,,0,5,1.3,2.0
+R_0723,Soquet enchufe,Soquetenchufe,,,unidad,,,0,5,0.4,0.0
+R_0724,Soquet ovalado,Soquetovalado,,Home Light,unidad,,,0,5,0.0,0.0
+R_0725,Soquet ovalado,Blanco humo,,Genova,unidad,,,0,5,0.0,4.0
+R_0726,Soquet ovalado,Soquetovalado,,BTicino,unidad,,,0,5,0.0,10.0
+R_0727,Soquet ovalado,Soquetovalado,,Megaluz,unidad,,,0,5,0.0,5.0
+R_0728,Soquet plano,Blanco Humo,,Genova,unidad,,,0,5,0.0,0.0
+R_0729,Soquet plano,Soquetplano,,BTicino,unidad,,,0,5,0.0,2.5
+R_0730,Soquet plano,Blanco fijo,,Genova,unidad,,,0,5,55.0,0.0
+R_0732,Spliter 4,Cable Tv,,, unidad ,,jupiter,0,5,0.0,8.0
+R_0733,Spot Light 7 W alf 1007,,,, unidad ,,,0,5,1.5,9.5
+R_0747,Stove Bolt 3/16 x 1,,,, ciento ,,,0,5,0.0,0.0
+R_0748,Stove Bolt 3/16 x 3/4,c/pan mixta zincado,,, ciento ,,,0,5,35.0,0.0
+R_0749,Stove Bolts 3/16 x 1,3/16 x 1,,, ciento ,,,0,5,35.0,0.0
+R_0750,Stove Bolts 3/16 x 1 1/2,3/16 x 1 1/2,,, ciento ,,,0,5,0.0,0.0
+R_0752,"Strech Film 20""",2 Kg,,, unidad ,,Inversiones garde,0,5,7.0,22.0
+R_0753,"Strech Film 9""",0.550Kg,,, unidad ,,Inversiones garde,0,5,2.0,9.0
+R_0754,Sumidero 2,Cromado,,Nacional, unidad ,,ALFA,0,5,1.0,5.0
+R_0755,Sumidero 4,Cromado,,Nacional, unidad ,,ALFA,0,5,13.0,12.0
+R_0756,Sup Pulguicida Perfuma,Elimina pulga sarna gar..,,Chica Verano,,,,0,5,13.0,2.0
+R_0757,Sup Pulguicida Perfuma,Elimina pulga sarna gar..,,Peluchin Plus,,,,0,5,0.0,3.0
+R_0758,Super Cola Gl,ColaGl,,,Gl,,,0,5,13.8,13.0
+R_0760,Supresor de Pico,negro omeg,,, unidad ,,,0,5,14.8,18.0
+R_0761,T Autoperforante 10 x 1 1/2,,,, millar ,,,0,5,7.9,0.0
+R_0766,T Wafer  p/br 8 x 3/4,punta broca,,, millar ,,NEGOCIACIONES GENERALES CIA,0,5,0.0,34.0
+R_0767,T Wafer p/ broca 8 x 1 1/2,8 x 1 1/2,,, millar ,,CIA,0,5,0.0,55.0
+R_0768,T Wafer p/ broca 8 x 1 1/4,8 x 1 1/4zincado,,, unidad ,,alfa,0,5,4.65,50.0
+R_0769,T Wafer p/ fina 8 x 1/2,8 X 1/2  Zincado,,, caja(1000pzs) ,,,0,5,1000.0,24.0
+R_0770,T Wafer p/f 8 x 3/4 ,punta fina,,, millar ,,NEGOCIACIONES GENERALES CIA,0,5,0.0,30.0
+R_0762,T spack 4 x 35,T spack 4 x 35,,, millar ,,,0,5,7.95,0.0
+R_0763,T spack 4 x 45,t spack 4 x 45,,, millar ,,,0,5,0.0,0.0
+R_0764,T spack 4 x 70,T spack 4 x 70,,, millar ,,,0,5,0.0,0.0
+R_0765,T spack 4 x 80,T spack 4 x 80,,, millar ,,,0,5,0.0,0.0
+R_0771,T. trompeta 6x2 p broca,,,, millar ,,NEGOCIACIONES GENERALES CIA,0,5,0.0,55.0
+R_0778,TAPA 1/2 HEMBRA,AGUA,,, unidad ,,,0,5,0.0,1.5
+R_0786,TARUGO MADERA,3-Ago,,STAR IMPORTADO, millar ,,,0,5,30.5,0.0
+R_0789,TE 1/2,,,, unidad ,,,0,5,0.0,3.0
+R_0798,TECHO Fibraforte 3.6,3.6mx1.10,,Fibraforte,UNIDAD,,,0,5,0.0,47.0
+R_0799,TECHO Fibraforte 3m,3mx1.10,,Fibraforte,UNIDAD,,,0,5,25.0,36.0
+R_0812,THINER P50,A 3GL,,ISSA, unidad ,,issa,0,5,0.0,15.0
+R_0814,THINNER AUTOMOTRIZ 3.7L,ACRILICO ENV 3.7L,,,Galon 3.7L,,issa,9,5,16.5,19.0
+R_0815,THINNER P55 ,ENVASADO 3L,,isa, galon 3l ,,,0,5,3.0,16.5
+R_0817,"TIJERA P/HOJALATERO 10""",TIJERA CALAMINA,,C&A, unidad ,,,0,5,0.0,15.0
+R_0829,TOMACORRIENTE 2,CON TIERRA empotrable,,CUBULL, UYNIDAD ,,,0,5,32.0,8.0
+R_0830,TOMACORRIENTE 2,CON TIERRA MARFIL,,EUROLITE, unidad ,,ALFA,0,5,56.0,5.0
+R_0833,TOMACORRIENTE 3,SOBREPONER,,ULTRA ELECTRIC, unidad ,,,0,5,0.0,5.0
+R_0835,TOMACORRIENTE 4 ,C TIERRA MARFIL,,EUROLITE, unidad ,,ALFA,0,5,0.0,6.0
+R_0841,TOMACORRIENTE MIXTO,empotrable,,CUBULL, unidad ,,,0,5,25.0,9.0
+R_0908,TORNILLO WAFER 8 X 1/2 ,ZINCADO P FINA,,, unidad ,,Jorge ramirez,0,5,0.0,22.0
+R_0922,TRIPLAY CAPIRUNI 4MM,,,, unidad ,,,0,5,0.0,30.0
+R_0926,TRIZ,PEGAMENTO INSTATANEO,,, unidad ,,,0,5,0.0,5.0
+R_0927,TUBO 2,,,ECO, unidad ,,,0,5,0.0,12.0
+R_0928,TUBO 2,,,pavco bamba, UNIDAD ,,,0,5,0.0,16.0
+R_0929,TUBO 4,,,ECO, unidad ,,,0,5,0.0,18.0
+R_0930,TUBO 4,,,PAKO, UNIDAD ,,,0,5,0.0,24.0
+R_0931,TUBO 4,,,NICOL, UNIDAD ,,,0,5,0.0,24.0
+R_0933,TUBO LUZ 3/4,,,ECO, unidad ,,,0,5,0.0,2.5
+R_0772,Tablero Fenolico 18,18x1200x2400mm,,, unidad ,,,0,5,2.5,0.0
+R_0773,"Tachuela  5/8""",10 tachuela azul,,,caja(500gr),,,0,5,9.8,15.0
+R_0774,"Tachuela 9/16"" (#8)",8 tachuela azul,,,caja(500gr),,NEGOCIACIONES GENERALES CIA,2,5,9.8,15.0
+R_0775,Tachuela N 12,,,,caja(500g),,NEGOCIACIONES GENERALES CIA,0,5,9.8,15.0
+R_0776,Taladro de Impacto BL 96 Nm,CIDLI20968 2 BATERIAS 4Ah+accesorios,,INGCO, unidad ,,alfa,0,5,2.38,400.0
+R_0777,Talco Americano,TalcoAmericano,,Derquin,kg,,DERQUIN,50,5,1.5,2.0
+R_0779,Tapa Ciega,tapa Hueco de tomacorriente,,,unidad,,,0,5,4.5,0.8
+R_0780,Tapa para tomacorriente,paratomacorriente,,MIFER,unidad,,,0,5,2.1,0.0
+R_0781,TapaNuca,Tela azulino,,,unidad,,,0,5,0.0,7.5
+R_0782,TapaNuca,Jean,,,unidad,,,0,5,15.0,10.0
+R_0783,TapaNuca,Naranja,,,unidad,,,0,5,12.5,0.0
+R_0784,Tapones oido,protector auditivo,,Steelpro,unidad,,,0,5,21.0,2.5
+R_0785,Tarugo Drywall,blanco,,ordo¤ez, millar ,,,0,5,0.0,110.0
+R_0787,Tarugo madera ranurado 5 /16,ranurado 5 /16,,importado, ciento ,,negociaciones generales cia,0,5,0.0,8.0
+R_0788,Tarugo naranja chico,naranjachico,,,,,,0,5,0.0,0.1
+R_0808,Tee Principal,drywall,,,,,,0,5,51.0,12.0
+R_0809,Tee Secundario,drywall,,,,,,0,5,32.0,4.5
+R_0810,Tee terciario,drywall,,,,,,0,5,0.0,2.5
+R_0811,Temple,25kg,,worsal, unidad ,,,0,5,0.0,20.0
+R_0813,Thinner Acrilico 1L,p-50,,Derquin,L,,,0,5,15.0,6.0
+R_0818,Tirafon 1/4 x 3,,,, ciento ,,,0,5,0.0,0.0
+R_0819,Tirafon 1/4 x 3 1/2,,,, ciento ,,,0,5,17.0,0.0
+R_0820,Tirafon 1/4 x 4,,,, ciento ,,,0,5,17.0,0.0
+R_0821,Tiralinea,30m,,INGCO, unidad ,,alfa,0,5,28.0,13.0
+R_0823,Toma TV UTV emprtrable,deluxe,,EUROLITE, unidad ,,,0,5,13.0,8.0
+R_0822,Toma triple industrial,,,tomacorriente, unidad ,,camver,0,5,0.0,24.0
+R_0825,TomaCorriente 1,abierto para pared,,eurolux,unidad,,,0,5,128.3,2.0
+R_0826,TomaCorriente 1,Toma1,,ultra electric,unidad,,,0,5,0.0,4.2
+R_0827,TomaCorriente 2,Para pared,,Epem,unidad,,,0,5,0.0,4.0
+R_0831,TomaCorriente 3,Corrientetriple,,Bticino,unidad,,,0,5,95.0,5.0
+R_0832,TomaCorriente 3,Corrientetriple,,Genova,unidad,,,0,5,32.0,8.0
+R_0844,TomaCorriete 3,Corrietetriple,,Top Light,unidad,,,0,5,64.0,5.0
+R_0824,Tomacorriene extencion 3,extencionTriple,,,unidad,,,0,5,21.0,4.0
+R_0828,Tomacorriente 2,corrientedoble,,BTicino,unidad,,,0,5,6.0,10.0
+R_0834,Tomacorriente 3 Empotrable ,Empotrable,,Eurolite, unidad ,,ALFA,0,5,0.0,6.0
+R_0837,Tomacorriente Doble Empotrable,,,Eurolite Delux, unidad ,,alfa,0,5,0.0,6.0
+R_0842,Tomacorriente Simple,Con tierra metal,,Cubull, unidad ,,camver,0,5,74.0,7.0
+R_0836,Tomacorriente doble,con tierra,,Cubull, unidad ,,camver,0,5,0.0,8.0
+R_0838,Tomacorriente doble sobrep c/tierra,marfil u-29,,eurolite, unidad ,,alfa,0,5,0.0,5.5
+R_0839,Tomacorriente extencion 4,Tomacorriente4,,,unidad,,,0,5,64.0,5.0
+R_0840,Tomacorriente extencion 5,Tomacorriente5,,,unidad,,,0,5,0.0,6.0
+R_0843,Tomacorriente triple visible c/tierra,Marfil YF323-23,,eurolite, unidad ,,alfa,0,5,0.0,5.0
+R_0961,Tornillo 6 x 1 ,,DRYWALL,,MILLAR,,,20,5,11.5,17.0
+R_0847,Tornillo Autoperforante,"10 X 1""",,Ciser,unidad,,,0,5,11.0,0.0
+R_0848,Tornillo Autoperforante,10-16 X 1 1/2,,ciser,unidad,,,0,5,11.5,0.0
+R_0849,Tornillo Autoperforante,"10-16 X 3/4""",,Ciser,,,,0,5,18.0,0.0
+R_0850,Tornillo Autoperforante,14mm X 11/2,,MSK Multistock,unidad,,,0,5,18.0,0.0
+R_0845,Tornillo Autoperforante 10 x 3 p/Broca,punta broca con arandela neopreno,,,MILLAR,,NEGOCIACIONES GENERALES CIA,1.5,5,91.0,0.0
+R_0854,Tornillo Autoperforante p/broca,8 X 3/4,,Bilder,caja(500pzs),,,0,5,500.0,0.0
+R_0855,Tornillo Autoperforante p/broca,8 X 1 1/2,,Bilder,caja(500pzs),,,0,5,500.0,0.0
+R_0856,Tornillo Autorroscante Cabeza plana,6 X 1 ,,Bilder,unidad,,,0,5,0.0,0.0
+R_0857,Tornillo Autorroscante Cabeza plana,"6 X 3/4""",,bilder,unidad,,,0,5,38.0,0.0
+R_0858,Tornillo Drywall,"6 X 1""",,Granel,unidad,,,0,5,26.0,0.0
+R_0859,"Tornillo Drywall, punta fina cabeza trompeta",negro 6X2 ,,MSK Multistock,caja(1000pzs),,,0,5,1000.0,55.0
+R_0860,Tornillo Framer punta fina,"7 X  7/16""",,mamut,Caja(100),,,0,5,100.0,0.0
+R_0861,Tornillo P/B 8 x 1,8 x 1 P/B,,, millar ,,,0,5,4.6,0.0
+R_0867,Tornillo PUNTA FINA,6 X 1,,construtek,millar,,,0,5,0.0,22.0
+R_0862,Tornillo Punta broca,"8 X 1/2 "" Zincado",,MSK Multistock,millar,,,0,5,7.2,27.0
+R_0863,Tornillo Punta broca,"6 X  1"" Zincado",,Ciser,millar,,,0,5,5.63,0.0
+R_0864,Tornillo Punta broca,"7 X 7/16"" zincado",,Ciser,unidad,,,0,5,5.3,0.0
+R_0865,Tornillo Punta broca,"6 X 1 1/4"" zincado",,Ciser,unidad,,,0,5,8.32,0.0
+R_0866,Tornillo Punta broca,"7 X 7/16"" zincado",,Mamut,unidad,,,0,5,0.0,0.0
+R_0868,Tornillo Spack,4 x 60,,,,,,0,5,0.0,58.0
+R_0906,Tornillo Trompeta Autoperforante,6 x 2 p/broca zincado,,, millar ,,camver,0,5,0.0,55.0
+R_0907,Tornillo Wafer,8 x 1 zincado,,, ciento ,,,0,5,0.0,8.0
+R_0846,Tornillo autoperforante,"7 X 7/16""",,Tinkur,unidad,,,0,5,6.0,0.0
+R_0851,Tornillo autoperforante 10 X 1,10 x 1,,, millar ,,NEGOCIACIONES GENERALES CIA,10,5,48.0,120.0
+R_0852,Tornillo autoperforante 10 x 2 p/broca,2x10,,,MILLAR,,NEGOCIACIONES GENERALES CIA,3,5,65.0,120.0
+R_0853,Tornillo autoperforante negro ,6 X 1 1/2,,Bilder,unidad,,,0,5,0.7,0.0
+R_0869,Tornillo spack,4 x 70,,,,,,0,5,0.0,0.0
+R_0870,Tornillo spack ,5X50,,, MILLAR ,,,0,5,0.0,73.0
+R_0871,Tornillo spack ,4X50,,, MILLAR ,,,0,5,0.0,0.0
+R_0872,Tornillo spack ,4.5 X 60,,MSK Multistock,unidad,,,0,5,0.0,0.0
+R_0873,Tornillo spack ,5 X 80,,Fabina Constructor,unidad,,,0,5,0.0,0.0
+R_0874,Tornillo spack ,4.5 X 50,,Fabina Constructor,unidad,,,0,5,0.0,0.0
+R_0875,Tornillo spack ,4.0 X 20,,Fabina Constructor,millar,,,0,5,0.0,0.0
+R_0876,Tornillo spack ,4x50,,MSK Multistock,ciento,,,0,5,0.0,8.0
+R_0877,Tornillo spack ,4.5 X 20,,Bilder,ciento,,,0,5,0.0,6.0
+R_0878,Tornillo spack ,3.0 X 12,,Tinkur,unidad,,,0,5,0.0,0.0
+R_0879,Tornillo spack ,4.5 X 60,,Bilder,unidad,,,0,5,0.0,0.0
+R_0880,Tornillo spack ,5.0 X 35,,Ciser,unidad,,,0,5,0.0,0.0
+R_0881,Tornillo spack ,4 X 25,,Tinkur,millar,,,0,5,0.0,0.0
+R_0882,Tornillo spack ,3.5 X 30,,Tinkur,unidad,,,0,5,0.0,0.0
+R_0883,Tornillo spack ,4 X 20,,Tinkur,unidad,,,0,5,0.0,0.0
+R_0884,Tornillo spack ,5 X 25,,Ciser,unidad,,,0,5,0.0,0.0
+R_0886,Tornillo spack 3.5 x 20,,,, millar ,,,0,5,0.0,19.0
+R_0887,Tornillo spack 3.5 x 35,,,, millar ,,,0,5,0.0,32.0
+R_0888,Tornillo spack 3.5 x 40,,,, millar ,,,0,5,0.0,33.0
+R_0889,Tornillo spack 3.5 x 50,,,, millar ,,,0,5,0.0,36.0
+R_0891,Tornillo spack 4 x 40,,,,MILLAR,,NEGOCIACIONES GENERALES CIA,31,5,28.0,45.0
+R_0892,Tornillo spack 4.5 x 40,,,, medio millar ,,,0,5,0.0,32.5
+R_0893,Tornillo spack 5 x 20,,,, millar ,,,0,5,0.0,50.0
+R_0894,Tornillo spack 5 x 30,,,, millar ,,,0,5,0.0,60.0
+R_0895,Tornillo spack 5 x 40,,,, millar ,,,0,5,0.0,0.0
+R_0896,Tornillo spack 5 x 50,,,, millar ,,,0,5,0.0,83.0
+R_0897,Tornillo spack 5 x 60,,,,MILLAR,unidad (1.0 un.): S/ 0.20 | Docena (12.0 un.): S/ 2.00 | ciento (100.0 un.): S/ 12.00 | millar (1000.0 un.): S/ 90.00,NEGOCIACIONES GENERALES CIA,1,5,51.0,90.0
+R_0898,Tornillo spack 5 x 70,,,, millar ,,,0,5,0.0,92.0
+R_0899,Tornillo spack 5 x 80,,,, millar ,unidad (1.0 un.): S/ 0.30 | Docena (12.0 un.): S/ 3.00,,999999,5,0.0,100.0
+R_0900,Tornillo spack 6 x 100,,,, millar ,,,0,5,0.0,194.0
+R_0901,Tornillo spack 6 x 120,,,, millar ,,,0,5,0.0,274.0
+R_0902,Tornillo spack 6 x 60,,,, millar ,,,0,5,0.0,123.0
+R_0903,Tornillo spack 6x80,M 6x80,,, millar ,,alfa,0,5,0.0,150.0
+R_0904,Tornillo tipo pan ,"7 X 7/16""",,Bilder,unidad,,,0,5,0.0,0.0
+R_0905,Tornillo trompeta autoperforante,6 x 1 1/2 p/broca,,Tinkur, millar ,,,0,5,0.0,50.0
+R_0909,Trampa Desague,2x2 pesado completo,,, unidad ,,,0,5,0.0,10.0
+R_0910,Trapezoidal 0.22,3.6x1.10x0.22,,, unidad ,,,0,5,0.0,36.0
+R_0176,Trapezoidal 0.30,Tr6 rojo 3.60x1.10x0.22,,, unidad ,,,0,5,2.0,36.0
+R_0911,Trapezoidal Transparente,100 x 105 x 3.60,,, unidad ,,Inversiones garde,0,5,0.0,65.0
+R_0916,Triplay 3.5mm,1.22mX2.44m,,economico,unidad,,,0,5,0.0,25.0
+R_0917,Triplay 4mm,1.22mX2.44m,,blanco economico,unidad,,,0,5,0.0,0.0
+R_0920,Triplay 8mm,lupuna1.22x2.44x8mm,,, unidad ,,,0,5,0.0,75.0
+R_0923,Triplay Fenolico Film 18mm,1.22mX2.44m,,ecogyn,unidad,,,0,5,0.0,80.0
+R_0953,Triplay Fenolico film tigger 17 mm,,Construccion,,unidad,,,18,5,0.0,75.0
+R_0924,Triplay Film,1.22mX2.44m,,construccion,unidad,,,0,5,0.0,108.0
+R_0925,Triplay Lupuna 8mm,1.22x2.44x8mm,,lupuna, unidad ,,,0,5,0.0,74.0
+R_0959,Tubo agua 1/2 5m,,,,UNIDAD,,,9,5,18.0,24.0
+R_0932,Tubo led emergencia 20 W,,,, unidad ,,,0,5,0.0,15.0
+R_0935,UFO LED  20 w 120 MM 7000k alf 1032,,,, unidad ,,,0,5,0.0,8.67
+R_0936,UFO LED  30 w 185 MM 7000k alf 1033 alf 1034,,,, unidad ,,,0,5,0.0,14.33
+R_0937,UFO LED  40 w,220 MM 700K,,ALFA, unidad ,,,0,5,0.0,11.3
+R_0938,UNION 1/2,AGUA,,NICOL, unidad ,,,0,5,0.0,1.5
+R_0939,Union Coaxial,cable Tv,,, unidad ,,jupiter,0,5,0.0,1.0
+R_0940,"Union Universal PVC con rosca 1/2""","PVC con rosca 1/con2""",,C&A,unidad,,negociaciones generales,0,5,0.0,4.5
+R_0942,VOLCANITA RH 12.7MM (1/2),,,VOLCAN, UNIDAD ,,,0,5,0.0,40.0
+R_0943,VOLCANITA ST 12.7MM (1/2),1.22 X 2.44,DRYWALL,, UNIDAD ,,,80,5,26.5,28.0
+R_0941,"Valvula PVC con rosca 1/2""","con rosca 1/con2""",,SCHUBERT,unidad,,,0,5,0.0,4.5
+R_0948,WINCHA 5X25MM,,,EUROTOOLS, unidad ,,ALFA,0,5,0.0,8.0
+R_0446,Waype,waype paño,,,kg,,DERQUIN,25,5,8.0,14.0
+R_0944,Wincha 10x25mm,Antigolpe hoja ancha,,INGCO, unidad ,,alfa,0,5,0.0,20.0
+R_0945,Wincha 5m,5m*19mm,,prescot, unidad ,,,0,5,0.0,7.0
+R_0949,Wincha 5x25mm,amarilla hoja ancha,,INGCO, unidad ,,alfa,0,5,0.0,9.0
+R_0950,Wincha 7.5m,7.5m*25mm,,prescot, unidad ,,,0,5,0.0,14.0
+R_0018,aceite 4 en 1 chico,,,economico, unidad ,,ALFA,0,5,0.0,2.0
+R_0043,"angulo 1""x1/2""",,,,unidad,,,0,5,30.48,0.4
+R_0066,arandela Neopreno 12,,,, millar ,,alfa,0,5,15.5,70.0
+R_0063,arandela liv 1/8 ,zincado,,, Kg ,,,0,5,11.36,14.0
+R_0062,arandela liviana 1/4,,,,Kg,,,24.75,5,7.5,14.0
+R_0072,arco de sierra hhfs3068,"300mm/ 12""",,INGCO, unidad ,,,0,5,35.0,14.0
+R_0075,armella cerrada 1 1/2,,,, ciento ,,,0,5,44.2,0.0
+R_0077,atomizador,chisguete rociador,,,,,,0,5,0.34,2.0
+R_0120,broca hss 11/64,,,,,,,0,5,0.0,0.0
+R_0121,broca hss 13/64,,,,,,,0,5,1.49,0.0
+R_0122,broca hss 17/64,,,,,,,0,5,0.0,0.0
+R_0123,broca hss 5/16,,,, unidad ,,negociaciones generales,0,5,0.0,5.0
+R_0124,broca hss 7/32,,,,,,,0,5,0.0,0.0
+R_0125,broca hss 9/64,P/Fierro dorado ,,eurotools, unidad ,,alfa,0,5,0.0,2.0
+R_0141,c Scolta 120,chapa 2 golpes,,cerradura,unidad,,,0,5,0.0,41.0
+R_0143,c Scolta 900,Chapa 3 golpes,,cerradura,unidad,,,0,5,0.0,0.0
+R_0147,c Yanes 112B,chapa 2 golpes,,cerradura,unidad,,,0,5,0.0,18.0
+R_0148,c Yanes 558B,chapa 3 golpes,,cerradura,,,,0,5,15.73,22.0
+R_0149,cable,16AWG 16H 200/500v,,phelix,m,,,0,5,3.5,2.0
+R_0151,cable,14 awg 14H 200/500V,,phelix,m,,,0,5,0.0,1.0
+R_0154,cable,03/05kv2X14AWG gris,,indeco,m,,,0,5,0.0,1.4
+R_0155,cable,TW80 450/750V 14AWG,,indeco rojo,m,,,0,5,21.0,1.2
+R_0158,cable acerado,colgador,,eurotools, metro ,,ALFA,0,5,1.2,22.0
+R_0159,cable vulcanizado,2X14 AWG NEGRO,,indeco, METRO ,,,0,5,13.0,6.0
+R_0162,caja Octagonal PVC,,,, unidad ,,alfa,0,5,0.0,1.0
+R_0163,caja P/llave termica monofasica,,,APG Electric,unidad,,,0,5,0.0,8.5
+R_0164,caja P/llave termica trifasica,Caja p/ instalaciones de superficie,,KBA,unidad,,,0,5,0.0,0.0
+R_0177,canaleta c/ sum,3m,,galv,,,,0,5,2.0,20.0
+R_0178,canaleta s/sum,3m,,galv,,,,0,5,0.0,18.0
+R_0180,candado 30mm,acero,,prescot, unidad ,,,0,5,9.0,7.0
+R_0181,candado 40mm,acero,,prescot, unidad ,,,0,5,16.0,8.0
+R_0185,candado dor 60 mm,60 mm,,EUROTOOLS, unidad ,,,0,5,0.0,10.0
+R_0186,candado dor 75 mm,75 mm,,EUROTOOLS, unidad ,,,0,5,0.0,13.0
+R_0194,ceradura perilla,,,wailec,,,,0,5,1.1,14.0
+R_0195,cerradura 2 golpe,,,phelix,,,,0,5,1.7,19.0
+R_0196,cerradura Andina Forte A130,Chapa 2 golpes,,Andina Forte A130,unidad,,,0,5,3.5,0.0
+R_0198,cerradura For Peru 559B,chapa 2 golpes,,For Peru 559B,,,,0,5,1.3,16.0
+R_0199,cerradura For Peru TC2373A,chapa 3 golpes,,For Peru TC2373A,,,,0,5,0.0,23.0
+R_0206,cerrojo V trop 1 1/2,1.5,,,,,,0,5,2.78,0.0
+R_0205,cerrojo trop 2,2,,, unidad ,,,0,5,1.4,2.0
+R_0207,chinches,,,, millar ,,jupiter,0,5,2.08,20.0
+R_0218,cinta embalaje,2x20Yardas,,knauff, unidad ,,ardiles,0,5,0.0,1.5
+R_0219,cinta embalaje,2x55 yardas ,,knauff, unidad ,,ardiles,0,5,0.0,3.5
+R_0225,clavo 1,disparo,,tanker, unidad ,,Jorge ramirez,0,5,0.0,10.0
+R_0229,clavo 1 1/4 X 15 s/c,1 1/4 X 15 s/c,,,,,,0,5,7.5,7.5
+R_0242,clavo 3/4 X 18 s/c,3/4 X 18 s/c,,,kg,,,0,5,0.0,0.0
+R_0255,clavo acero,,,,,,,0,5,1.0,0.0
+ ,clavo liso negro 1 1/2,,,,,,,0,5,0.0,12.0
+R_0266,clavo liso negro 1 1/2,,,,,,,0,5,17.5,12.0
+R_0270,coa cola,bebidas golosinas,,,,,,0,5,7.5,0.0
+R_0271,coca cola,bebidas golosinas,,,,,,0,5,11.2,0.0
+R_0272,coca cola ,bebidas golosinas,,,,,,0,5,30.0,0.0
+R_0299,cuter cuchilla,cuter cuchilla,,,unidad,,,0,5,13.9,1.0
+R_0317,disco de corte 4 1/2,,,Ingco, unidad ,,alfa,0,5,0.0,2.0
+R_0330,enchufe,negro plano|,,,unidad,,,0,5,0.0,1.2
+R_0333,enchufe Colores,punta plana,,economico,unidad,,,0,5,13.6,2.5
+R_0334,enchufe Colores,punta redonda,,economico,unidad,,,0,5,9.7,2.5
+R_0331,enchufe amarillo,hembra,,electroenchufe,unidad,,,0,5,0.0,10.0
+R_0332,enchufe amarillo,macho,,electroenchufe,unidad,,,0,5,0.0,10.0
+R_0336,enchufe industrial,s/tierra,,Home Light, unidad ,,,0,5,3.5,4.0
+R_0337,enchufe industrial,s/tierra,,Volteck, unidad ,,,0,5,13.05,4.5
+R_0339,enchufe industrial ,hembra,,,unidad,,,0,5,15.59,0.0
+R_0340,enchufe negro amarillo,macho,,,unidad,,,0,5,19.85,4.0
+R_0341,enchufe negro amarillo,hembra,,,unidad,,,0,5,18.0,4.0
+R_0342,enchufe triple,enchufetriple,,,unidad,,,0,5,26.5,2.0
+R_0343,enchufe vision plano,colores,,vision,unidad,,,0,5,8.1,4.0
+R_0964,escalera 10 pasos,,Madera,,UNIDAD,,,8,5,0.0,115.0
+R_0377,"extension flexible 12""",para atornillar,,pretul, unidad ,,,0,5,5.0,12.0
+R_0378,extension magnetico 60mm,,,truper, unidad ,,,0,5,44.67,8.0
+R_0379,extension magnetico 60mm,estuche de 5,,Truper, estuche ,,,0,5,50.5,25.0
+R_0418,grapas p/cable N 7,,,Mifer, caja ,,alfa,0,5,0.0,8.0
+R_0419,grapas p/cable N 8,,,Mifer, caja ,,alfa,0,5,0.0,8.5
+R_0425,guante badana,clute,,,unidad,,,0,5,0.0,9.0
+R_0447,huaype,importado,,, kg ,,,0,5,0.0,12.0
+R_0449,inca cola,bebidas golosinas,,,,,,0,5,0.0,0.0
+R_0450,inca cola,bebidas golosinas,,,,,,0,5,0.0,0.0
+R_0955,inca cola mediana,,Bebidas,,,,,9,5,0.0,1.8
+R_0456,insecticida,mata cucarachas moscas,,doclorotrin,,,,0,5,2.9,0.0
+R_0457,insecticida,mata todo tipo insecto,,rapidex c.e ,,,,0,5,0.0,0.0
+R_0458,insecticida,elimina cucaracha moscas,,by litex plus,,,,0,5,0.0,0.0
+R_0462,interruptor 1,interruptor1,,Epen,unidad,,,0,5,0.0,0.0
+R_0477,juego 4 desarmadores,reversible,,C&A, unidad ,,ardiles,0,5,0.0,7.5
+R_0503,lija 7 1/4 x 5 und 120,repuesto 120,,Eurotools, unidad ,,,0,5,0.0,6.0
+R_0524,lija N40 - 4 1/2,,,Eurotools, unidad ,,alfa,0,5,0.0,4.0
+R_0525,lija N60 - 4 1/3,,,Eurotools, unidad ,,alfa,0,5,0.0,4.0
+R_0526,lija N80 - 4 1/4,,,Eurotools, unidad ,,alfa,0,5,0.0,4.0
+R_0538,llave jardin 1/2,,,valmax, unidad ,,ardiles,0,5,19.4,14.0
+R_0539,llave jardin 1/2,,,C&A, unidad ,,ardiles,0,5,22.0,9.0
+R_0540,llave mixta 10 mm,10 chrome vanadium,,eurotools, unidad ,,alfa,0,5,7.0,4.0
+R_0541,llave mixta 12 mm,,,, unidad ,,,0,5,8.2,4.0
+R_0542,llave mixta 13 mm,chrome vanadium 13 mm,,eurotools, unidad ,,,0,5,0.0,4.5
+R_0543,llave mixta 14 mm,,,, unidad ,,,0,5,25.0,4.5
+R_0545,llave paso 1/2,c/rosca,,C&A, unidad ,,ardiles,0,5,5.5,4.0
+R_0546,llave paso 1/2,s/rosca,,C&A, unidad ,,ardiles,0,5,9.5,4.0
+R_0553,luna soldar 12,ALF 055,,EUROTOOLS, unidad ,,alfa,0,5,0.0,1.5
+R_0618,pega moscas,pegamoscas,,fly ribbon,,,,0,5,0.0,0.0
+R_0628,perno 1/4 x 1,zincado,,Hexagonal, ciento ,,alfa,0,5,8.5,20.0
+R_0633,perno 1/4 x 3 1/2,Hexagonal,,, ciento ,,,0,5,0.0,30.0
+R_0635,perno 1/4 x 4,c. coche,,zincado, ciento ,,negociaciones generales,0,5,3.5,280.0
+R_0636,perno 1/4 x 4,Hexagonal,,, ciento ,,,0,5,11.0,28.0
+R_0638,perno 1/4 x 6,zincado,,coche, ciento ,,negociaciones generales,0,5,0.0,64.0
+R_0639,perno 2 1/2 x 1/4,c. coche,,zincado, ciento ,,negociaciones generales,0,5,12.89,24.0
+R_0643,pintura spray,"amarillo cat rojo fuego , oscuro , blanco mate",,, unidad ,,,0,5,4.3,6.5
+R_0645,placa 1/2,1.22x2.44,,gyplac,,,,0,5,0.0,0.0
+R_0647,placa superboard 6 mm,,,6 mm,unidad,,,0,5,0.0,56.0
+R_0691,selladora,3.2kg,,, galon ,,,0,5,4.0,38.0
+R_0696,set Puntilla desarmador,Cruz PH2 50 mm(5 unidades,,eurotools, set(5) ,,jupiter,0,5,5.0,8.0
+R_0734,spray ,negro brillante,,C&A,unidad,,,0,5,0.0,7.0
+R_0735,spray ,negre mate,,C&A,unidad,,,0,5,0.0,7.0
+R_0736,spray ,blanco brillante,,,unidad,,,0,5,0.0,7.0
+R_0737,spray ,blanco mate,,,unidad,,,0,5,0.0,7.0
+R_0738,spray ,silver,,,unidad,,,0,5,0.0,7.0
+R_0739,spray ,rojo fuego,,, unidad ,,,0,5,0.0,7.0
+R_0740,spray ,rojo brillante,,,unidad,,,0,5,0.0,7.0
+R_0741,spray ,medium blue,,,unidad,,,0,5,0.0,7.0
+R_0742,spray ,premium oro,,, unidad ,,,0,5,43.0,9.0
+R_0743,spray ,Amarillo Limon,,C&A, unidad ,,ardiles,0,5,31.0,7.0
+R_0744,spray ,Fucsia,,C&A, unidad ,,ardiles,0,5,17.0,7.0
+R_0745,spray ,Cobre,,C&A, unidad ,,ardiles,0,5,0.0,8.0
+R_0746,spray ,dorado,,C&A, unidad ,,ardiles,0,5,0.0,9.0
+R_0751,stove bolts 3/16 x 2,3/16 x 2,,, ciento ,,,0,5,0.0,0.0
+R_0951,tabla construccion,,Madera,,unidad,,,6,5,0.0,25.0
+R_0790,techo 3.6m ,3.6m,,m,,,,0,5,0.0,0.0
+R_0791,techo 3.6m ,3.6m,,m,,,,0,5,105.0,0.0
+R_0792,techo 3.6m ,3.6m,,m,,,,0,5,86.0,0.0
+R_0793,techo 3.6m ,3.6m,,m,,,,0,5,0.0,0.0
+R_0794,techo 3.6m ,3.6m,,m,,,,0,5,0.0,0.0
+R_0795,techo 3.6m ,3.6m,,m,,,,0,5,0.0,0.0
+R_0796,techo ecotecho 3.6m,3.6mx1.10,,ecotecho,,,,0,5,0.0,25.0
+R_0797,techo ecotecho 3m,3mx1.10,,ecotecho,,,,0,5,0.0,22.0
+R_0800,techo rojo,3x1.10 m,,techito,,,,0,5,22.0,21.0
+R_0801,techo rojo onda TR4 3.6m ,3.6x1.10x1.5mm,,techito,,,,0,5,0.0,0.0
+R_0802,techo traslucido Fibraforte 3.6m ,3.6m,,Fibraforte,,,,0,5,0.0,0.0
+R_0803,techo traslucido Fibraforte 3m ,3mx1.10,,Fibraforte,,,,0,5,0.0,70.0
+R_0804,techo traslucido techito 3.6m ,3.6mx0.80,,techito,,,,0,5,0.0,39.0
+R_0805,techo traslucido techito 3m ,3mx1.10,,techito,,,,0,5,14.0,40.0
+R_0806,techo traslucido techoplus 3.6m ,3.6mx0.80,,techoplus,,,,0,5,39.0,45.0
+R_0807,techo traslucido techoplus 3m ,3mx1.10,,techoplus,,,,0,5,55.0,45.0
+R_0816,thinner p55 cil,galon 3.7l,,isa, galon 3.8l ,,,0,5,3.8,18.0
+R_0885,tornillo spack 3.5 x 16,"3,5 x 16",,, millar ,,CIA,0,5,0.0,20.0
+R_0890,tornillo spack 4 x 16,4 x 16,,, millar ,,CIA,0,5,0.0,22.0
+R_0957,tornillo trompeta philipsP/Broca zincado  6 x 1 1/2,,Tornillo,,MILLAR,,NEGOCIACIONES GENERALES CIA,1,5,30.0,50.0
+R_0956,tornillo trompeta philipsP/Broca zincado  6 x 1 1/4,,,,millar,,NEGOCIACIONES GENERALES CIA,2,5,26.0,43.0
+R_0958,tornillo trompeta philipsP/Broca zincado  6 x 2,,Tornillo,,MILLAR,,NEGOCIACIONES GENERALES CIA,1,5,31.0,52.0
+R_0952,trigo laton 450,,,,unidad,,BACKUS,48,5,0.0,6.0
+R_0912,triplay,tablero Fenolico BC CMP 18x1200x2400mm,,, unidad ,,,0,5,0.0,115.0
+R_0913,triplay, Plywood Okoume B/C 2.22x2.44x4mm,,, unidad ,,,0,5,0.0,37.0
+R_0914,triplay 0.92x2.16m,0.92x2.16m,,,unidad,,,0,5,0.0,18.0
+R_0915,triplay 10mm,1.22mX2.44m,,lupuna,unidad,,,0,5,0.0,100.0
+R_0918,triplay 4mm,1.22mX2.44m,,lupuna(saldo),unidad,,,0,5,0.0,38.0
+R_0919,triplay 6mm,1.22mX2.44m,,lupuna,unidad,,,0,5,0.0,54.0
+R_0921,triplay 8mm,1.22mX2.44m,,lupuna,unidad,,,0,5,0.0,74.0
+R_0934,tuerca 1/4,tuerca  exagonal,,,ciento,,,0,5,0.0,6.0
+R_0946,wincha 5mx19mm,amarilla,,INGCO, unidad ,,alfa,0,5,0.0,8.0
+R_0947,wincha 5mx25mm,antigolpe hoja ancha,,INGCO, unidad ,,alfa,0,5,0.0,11.0
